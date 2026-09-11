@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meridian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <header class="hud">
+      <div class="brand">
+        <p class="wordmark">Meridian</p>
+        <p class="tag">A quieter sky</p>
+      </div>
+
+      <label class="search">
+        <span class="search-label">Find a flight</span>
+        <input id="search" placeholder="Callsign or ICAO" autocomplete="off" spellcheck="false" />
+        <ul id="results" class="results" hidden></ul>
+      </label>
+
+      <div id="status" class="status" data-state="idle">
+        <span class="pulse"></span>
+        <div>
+          <p id="status-label" class="status-label">Waiting for the map</p>
+          <p id="status-meta" class="status-meta">OpenSky live positions</p>
+        </div>
+      </div>
+    </header>
+
+    <aside id="sheet" class="sheet" hidden>
+      <button type="button" id="close" class="close" aria-label="Close flight details">Close</button>
+      <p id="sheet-eyebrow" class="eyebrow"></p>
+      <h2 id="sheet-callsign"></h2>
+      <p id="sheet-icao" class="icao"></p>
+      <dl id="sheet-facts"></dl>
+    </aside>
+
+    <footer class="credit">
+      Positions from <a href="https://opensky-network.org">OpenSky Network</a>
+      · Map <a href="https://openfreemap.org">OpenFreeMap</a>
+    </footer>
+
+    <script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
