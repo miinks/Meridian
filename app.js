@@ -1,11 +1,19 @@
 const POLL_MS = 10_000;
 const EMPTY = { type: "FeatureCollection", features: [] };
+const ICAO = /^[a-f0-9]{6}$/i;
 
 const state = {
   flights: new Map(),
   trails: new Map(),
   selectedId: null,
+  following: false,
+  airborneOnly: true,
   bbox: null,
+  creditsRemaining: null,
+  authenticated: false,
+  retryAt: 0,
+  inflight: false,
+  programmaticMove: false,
 };
 
 const ui = {
@@ -16,10 +24,21 @@ const ui = {
   statusMeta: document.getElementById("status-meta"),
   sheet: document.getElementById("sheet"),
   close: document.getElementById("close"),
+  follow: document.getElementById("follow"),
+  airborne: document.getElementById("airborne"),
+  tip: document.getElementById("tip"),
 };
 
 function lerp(from, to, t) {
   return from + (to - from) * t;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function formatAltitude(meters, onGround) {
@@ -44,6 +63,18 @@ function formatVerticalRate(metersPerSecond, onGround) {
   const fpm = Math.round(metersPerSecond * 196.85);
   if (Math.abs(fpm) < 80) return "Level";
   return `${fpm > 0 ? "+" : ""}${fpm.toLocaleString()} fpm`;
+}
+
+function formatWait(seconds) {
+  if (seconds >= 3600) return `${Math.ceil(seconds / 3600)}h`;
+  if (seconds >= 60) return `${Math.ceil(seconds / 60)}m`;
+  return `${Math.max(1, Math.round(seconds))}s`;
+}
+
+function creditMeta() {
+  const source = state.authenticated ? "OpenSky signed in" : "OpenSky anonymous";
+  if (state.creditsRemaining == null) return source;
+  return `${source} · ${state.creditsRemaining.toLocaleString()} credits`;
 }
 
 function setStatus(kind, label, meta) {
@@ -82,20 +113,23 @@ function boundsToBBox(map) {
   };
 }
 
-async function fetchFlights(bbox) {
-  const params = new URLSearchParams({
-    lamin: String(bbox.south),
-    lomin: String(bbox.west),
-    lamax: String(bbox.north),
-    lomax: String(bbox.east),
-  });
-  const response = await fetch(`/api/opensky/states/all?${params}`);
-  if (response.status === 429) {
-    throw new Error("OpenSky is rate-limiting this IP. Wait about 10 seconds.");
-  }
-  if (!response.ok) throw new Error(`OpenSky returned ${response.status}`);
-  const payload = await response.json();
-  return (payload.states || []).map(parseFlight).filter(Boolean);
+function aroundFlight(flight, deg = 1.1) {
+  return {
+    south: Math.max(-90, flight.latitude - deg),
+    west: Math.max(-180, flight.longitude - deg),
+    north: Math.min(90, flight.latitude + deg),
+    east: Math.min(180, flight.longitude + deg),
+  };
+}
+
+function visibleFlights() {
+  const rows = [...state.flights.values()];
+  if (!state.airborneOnly) return rows;
+  return rows.filter((flight) => !flight.onGround || flight.id === state.selectedId);
+}
+
+function matchesQuery(flight, needle) {
+  return flight.callsign.toLowerCase().includes(needle) || flight.id.toLowerCase().includes(needle);
 }
 
 function rememberTrail(flight) {
@@ -142,34 +176,73 @@ function selectedExpression(selectedId, selectedValue, fallback) {
   return ["case", ["==", ["get", "id"], selectedId || ""], selectedValue, fallback];
 }
 
+function syncFollowButton() {
+  ui.follow.setAttribute("aria-pressed", state.following ? "true" : "false");
+  ui.follow.textContent = state.following ? "Following" : "Follow";
+}
+
+function syncUrl() {
+  const url = new URL(location.href);
+  if (state.selectedId) url.searchParams.set("icao", state.selectedId);
+  else url.searchParams.delete("icao");
+  history.replaceState(null, "", url);
+}
+
+function sheetOffset() {
+  return window.matchMedia("(max-width: 820px)").matches ? [0, -70] : [160, 0];
+}
+
 function renderSheet(flight) {
-  if (!flight) {
+  if (!flight && !state.selectedId) {
     ui.sheet.hidden = true;
+    document.title = "Meridian";
     return;
   }
 
-  const facts = [
-    ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
-    ["Speed", formatSpeed(flight.speedMs)],
-    ["Heading", formatHeading(flight.heading)],
-    ["Vertical", formatVerticalRate(flight.verticalRateMs, flight.onGround)],
-    ["Squawk", flight.squawk || "—"],
-    ["Country", flight.country],
-  ];
+  const callsign = flight?.callsign || state.selectedId?.toUpperCase() || "Flight";
+  const facts = flight
+    ? [
+        ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
+        ["Speed", formatSpeed(flight.speedMs)],
+        ["Heading", formatHeading(flight.heading)],
+        ["Vertical", formatVerticalRate(flight.verticalRateMs, flight.onGround)],
+        ["Squawk", flight.squawk || "—"],
+        ["Country", flight.country],
+      ]
+    : [
+        ["Altitude", "Locating…"],
+        ["Speed", "—"],
+        ["Heading", "—"],
+        ["Vertical", "—"],
+        ["Squawk", "—"],
+        ["Country", "—"],
+      ];
 
-  document.getElementById("sheet-eyebrow").textContent = flight.onGround ? "On the ground" : "In flight";
-  document.getElementById("sheet-callsign").textContent = flight.callsign;
-  document.getElementById("sheet-icao").textContent = flight.id.toUpperCase();
+  document.getElementById("sheet-eyebrow").textContent = state.following
+    ? "Tracking"
+    : flight?.onGround
+      ? "On the ground"
+      : flight
+        ? "In flight"
+        : "Looking up";
+  document.getElementById("sheet-callsign").textContent = callsign;
+  document.getElementById("sheet-icao").textContent = (flight?.id || state.selectedId || "").toUpperCase();
   document.getElementById("sheet-facts").innerHTML = facts
     .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
     .join("");
   ui.sheet.hidden = false;
+  document.title = `${callsign} · Meridian`;
+  syncFollowButton();
 }
 
-function selectFlight(id, map, { fly = false } = {}) {
+function selectFlight(id, map, { fly = false, follow = false } = {}) {
   state.selectedId = id;
+  if (!id) state.following = false;
+  else if (follow) state.following = true;
+
   const flight = id ? state.flights.get(id) : null;
   renderSheet(flight);
+  syncUrl();
 
   if (map.getLayer("flights")) {
     map.setLayoutProperty("flights", "icon-image", selectedExpression(id, "plane-selected", "plane"));
@@ -177,39 +250,195 @@ function selectFlight(id, map, { fly = false } = {}) {
   }
 
   if (fly && flight) {
+    state.programmaticMove = true;
     map.easeTo({
       center: [flight.longitude, flight.latitude],
       zoom: Math.max(map.getZoom(), 8.5),
       duration: 900,
-      offset: [160, 0],
+      offset: sheetOffset(),
     });
   }
 }
 
-function renderResults(query) {
+function renderResults(query, extra = []) {
   const needle = query.trim().toLowerCase();
-  if (needle.length < 2) {
+  if (needle.length < 2 && extra.length === 0) {
     ui.results.hidden = true;
     ui.results.innerHTML = "";
     return;
   }
 
-  const matches = [...state.flights.values()]
-    .filter((flight) => flight.callsign.toLowerCase().includes(needle) || flight.id.includes(needle))
-    .slice(0, 6);
-
-  ui.results.innerHTML = matches
-    .map(
+  const matches = needle.length < 2 ? [] : visibleFlights().filter((flight) => matchesQuery(flight, needle)).slice(0, 6);
+  const items = [
+    ...matches.map(
       (flight) => `
         <li>
-          <button type="button" data-id="${flight.id}">
-            <strong>${flight.callsign}</strong>
-            <span>${flight.country}</span>
+          <button type="button" data-id="${escapeHtml(flight.id)}">
+            <strong>${escapeHtml(flight.callsign)}</strong>
+            <span>${escapeHtml(flight.country || "")}</span>
           </button>
         </li>`,
-    )
-    .join("");
-  ui.results.hidden = matches.length === 0;
+    ),
+    ...extra,
+  ];
+
+  if (needle.length >= 3) {
+    items.push(`
+      <li>
+        <button type="button" class="worldwide" data-worldwide="1">
+          Search worldwide for ${escapeHtml(query.trim())}
+        </button>
+      </li>`);
+  }
+
+  ui.results.innerHTML = items.join("");
+  ui.results.hidden = items.length === 0;
+}
+
+async function fetchFlights({ bbox, icao24, worldwide } = {}) {
+  const params = new URLSearchParams();
+  if (icao24) params.set("icao24", icao24.toLowerCase());
+  else if (bbox && !worldwide) {
+    params.set("lamin", String(bbox.south));
+    params.set("lomin", String(bbox.west));
+    params.set("lamax", String(bbox.north));
+    params.set("lomax", String(bbox.east));
+  }
+
+  const query = params.toString();
+  const response = await fetch(`/api/opensky/states/all${query ? `?${query}` : ""}`);
+  const remaining = response.headers.get("X-Rate-Limit-Remaining");
+  if (remaining != null && remaining !== "") state.creditsRemaining = Number(remaining);
+
+  if (response.status === 429) {
+    const retry = Number(response.headers.get("X-Rate-Limit-Retry-After-Seconds") || 10);
+    state.retryAt = Date.now() + retry * 1000;
+    throw new Error(`OpenSky quota reached. Retry in ${formatWait(retry)}.`);
+  }
+  if (!response.ok) throw new Error(`OpenSky returned ${response.status}`);
+  const payload = await response.json();
+  return (payload.states || []).map(parseFlight).filter(Boolean);
+}
+
+function ingest(next, { replace = true } = {}) {
+  const now = Date.now();
+  const nextMap = replace ? new Map() : new Map(state.flights);
+  for (const flight of next) {
+    const previous = state.flights.get(flight.id);
+    nextMap.set(flight.id, {
+      ...flight,
+      prevLongitude: previous?.longitude ?? flight.longitude,
+      prevLatitude: previous?.latitude ?? flight.latitude,
+      receivedAt: now,
+    });
+    rememberTrail(flight);
+  }
+  state.flights = nextMap;
+  return now;
+}
+
+function followCamera(map, flight) {
+  if (!state.following || !flight) return;
+  state.programmaticMove = true;
+  map.easeTo({
+    center: [flight.longitude, flight.latitude],
+    duration: Math.min(POLL_MS, 8000),
+    easing: (t) => t,
+    offset: sheetOffset(),
+    essential: true,
+  });
+}
+
+async function refresh(map, { silent = false } = {}) {
+  if (state.inflight || !state.bbox) return;
+  if (document.hidden) return;
+  if (Date.now() < state.retryAt) {
+    const wait = Math.ceil((state.retryAt - Date.now()) / 1000);
+    setStatus("error", "Signal paused", `OpenSky retry in ${formatWait(wait)}`);
+    return;
+  }
+
+  const selected = state.selectedId ? state.flights.get(state.selectedId) : null;
+  if (!silent && state.flights.size === 0) {
+    setStatus("loading", state.selectedId ? `Locating ${state.selectedId.toUpperCase()}` : "Listening for traffic", creditMeta());
+  }
+
+  state.inflight = true;
+  try {
+    let next;
+    if (state.following && selected) next = await fetchFlights({ bbox: aroundFlight(selected) });
+    else if (state.selectedId && !selected) next = await fetchFlights({ icao24: state.selectedId });
+    else next = await fetchFlights({ bbox: state.bbox });
+
+    if (state.following && state.selectedId && !next.some((flight) => flight.id === state.selectedId)) {
+      const exact = await fetchFlights({ icao24: state.selectedId });
+      if (exact.length) next = [...exact, ...next.filter((flight) => flight.id !== state.selectedId)];
+    }
+
+    const now = ingest(next);
+    const tracked = state.selectedId ? state.flights.get(state.selectedId) : null;
+    const airborne = next.filter((flight) => !flight.onGround).length;
+
+    if (state.selectedId && !tracked) {
+      setStatus("error", "Not transmitting", creditMeta());
+    } else if (state.following && tracked) {
+      setStatus("live", `Tracking ${tracked.callsign}`, creditMeta());
+      followCamera(map, tracked);
+    } else {
+      setStatus(
+        "live",
+        `${airborne.toLocaleString()} airborne`,
+        `Updated ${new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · ${creditMeta()}`,
+      );
+    }
+
+    renderSheet(tracked || null);
+    renderResults(ui.search.value);
+  } catch (error) {
+    setStatus("error", "Signal lost", error.message);
+  } finally {
+    state.inflight = false;
+  }
+}
+
+async function searchWorldwide(map, query) {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < 2 || state.inflight) return;
+
+  setStatus("loading", ICAO.test(needle) ? "Looking up ICAO" : "Scanning worldwide", "Uses extra OpenSky credits");
+  ui.results.hidden = true;
+  state.inflight = true;
+  let foundOne = false;
+
+  try {
+    const next = ICAO.test(needle)
+      ? await fetchFlights({ icao24: needle })
+      : await fetchFlights({ worldwide: true });
+    const matches = next.filter((flight) => matchesQuery(flight, needle));
+
+    if (matches.length === 1) {
+      ingest(matches, { replace: false });
+      selectFlight(matches[0].id, map, { fly: true, follow: true });
+      ui.search.value = "";
+      renderResults("");
+      foundOne = true;
+    } else if (matches.length > 0) {
+      ingest(matches, { replace: false });
+      renderResults(query);
+      setStatus("live", `${matches.length} matches worldwide`, creditMeta());
+    } else {
+      renderResults(query, [
+        `<li><button type="button" disabled>No live match for ${escapeHtml(query.trim())}</button></li>`,
+      ]);
+      setStatus("error", "Not transmitting", creditMeta());
+    }
+  } catch (error) {
+    setStatus("error", "Search failed", error.message);
+  } finally {
+    state.inflight = false;
+  }
+
+  if (foundOne) await refresh(map, { silent: true });
 }
 
 function paintFlights(map) {
@@ -218,7 +447,7 @@ function paintFlights(map) {
   if (!source) return;
 
   const now = Date.now();
-  const features = [...state.flights.values()].map((flight) => {
+  const features = visibleFlights().map((flight) => {
     const t = Math.min(1, (now - flight.receivedAt) / POLL_MS);
     const eased = t * t * (3 - 2 * t);
     return {
@@ -256,38 +485,17 @@ function paintFlights(map) {
   });
 }
 
-async function refresh(map) {
-  if (!state.bbox) return;
-  if (state.flights.size === 0) setStatus("loading", "Listening for traffic", "OpenSky live positions");
+function hideTip() {
+  ui.tip.hidden = true;
+}
 
-  try {
-    const next = await fetchFlights(state.bbox);
-    const now = Date.now();
-    const nextMap = new Map();
-
-    for (const flight of next) {
-      const previous = state.flights.get(flight.id);
-      nextMap.set(flight.id, {
-        ...flight,
-        prevLongitude: previous?.longitude ?? flight.longitude,
-        prevLatitude: previous?.latitude ?? flight.latitude,
-        receivedAt: now,
-      });
-      rememberTrail(flight);
-    }
-
-    state.flights = nextMap;
-    const airborne = next.filter((flight) => !flight.onGround).length;
-    setStatus(
-      "live",
-      `${airborne.toLocaleString()} airborne`,
-      `Updated ${new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`,
-    );
-    renderSheet(state.selectedId ? state.flights.get(state.selectedId) : null);
-    renderResults(ui.search.value);
-  } catch (error) {
-    setStatus("error", "Signal lost", error.message);
-  }
+function showTip(event) {
+  const callsign = event.features?.[0]?.properties?.callsign;
+  if (!callsign) return hideTip();
+  ui.tip.hidden = false;
+  ui.tip.textContent = callsign;
+  ui.tip.style.left = `${event.point.x}px`;
+  ui.tip.style.top = `${event.point.y}px`;
 }
 
 const map = new maplibregl.Map({
@@ -298,7 +506,7 @@ const map = new maplibregl.Map({
   attributionControl: { compact: true },
 });
 
-map.on("load", () => {
+map.on("load", async () => {
   drawAircraftIcon(map, "plane", "#d7dde6");
   drawAircraftIcon(map, "plane-selected", "#e8c17a", true);
 
@@ -333,7 +541,19 @@ map.on("load", () => {
     },
   });
 
+  try {
+    const status = await fetch("/api/status").then((response) => response.json());
+    state.authenticated = Boolean(status.authenticated);
+  } catch {
+    state.authenticated = false;
+  }
+
   state.bbox = boundsToBBox(map);
+  const bootIcao = new URLSearchParams(location.search).get("icao");
+  if (bootIcao) {
+    selectFlight(bootIcao.toLowerCase(), map, { follow: true });
+    renderSheet(null);
+  }
   refresh(map);
   setInterval(() => refresh(map), POLL_MS);
   requestAnimationFrame(function tick() {
@@ -344,36 +564,102 @@ map.on("load", () => {
 
 let moveTimer;
 map.on("moveend", () => {
+  if (state.programmaticMove) {
+    state.programmaticMove = false;
+    return;
+  }
+  if (state.following) return;
   clearTimeout(moveTimer);
   moveTimer = setTimeout(() => {
     state.bbox = boundsToBBox(map);
     refresh(map);
-  }, 700);
+  }, 1600);
+});
+
+map.on("dragstart", () => {
+  if (!state.following) return;
+  state.following = false;
+  syncFollowButton();
+  const flight = state.selectedId ? state.flights.get(state.selectedId) : null;
+  renderSheet(flight || null);
 });
 
 map.on("click", "flights", (event) => {
   const id = event.features?.[0]?.properties?.id;
-  if (id) selectFlight(id, map);
+  if (id) selectFlight(id, map, { follow: true, fly: true });
 });
 
 map.on("click", (event) => {
   const hits = map.queryRenderedFeatures(event.point, { layers: ["flights"] });
-  if (hits.length === 0) selectFlight(null, map);
+  if (hits.length === 0) {
+    const wasTracking = Boolean(state.selectedId);
+    selectFlight(null, map);
+    if (wasTracking) {
+      state.bbox = boundsToBBox(map);
+      refresh(map);
+    }
+  }
 });
 
 map.on("mouseenter", "flights", () => {
   map.getCanvas().style.cursor = "pointer";
 });
+map.on("mousemove", "flights", showTip);
 map.on("mouseleave", "flights", () => {
   map.getCanvas().style.cursor = "";
+  hideTip();
 });
 
 ui.search.addEventListener("input", () => renderResults(ui.search.value));
+ui.search.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const needle = ui.search.value.trim().toLowerCase();
+  const matches = visibleFlights().filter((flight) => matchesQuery(flight, needle));
+  if (matches.length === 1) {
+    selectFlight(matches[0].id, map, { fly: true, follow: true });
+    ui.search.value = "";
+    renderResults("");
+    return;
+  }
+  searchWorldwide(map, ui.search.value);
+});
+
 ui.results.addEventListener("click", (event) => {
+  const worldwide = event.target.closest("button[data-worldwide]");
+  if (worldwide) {
+    searchWorldwide(map, ui.search.value);
+    return;
+  }
   const button = event.target.closest("button[data-id]");
   if (!button) return;
-  selectFlight(button.dataset.id, map, { fly: true });
+  selectFlight(button.dataset.id, map, { fly: true, follow: true });
   ui.search.value = "";
   renderResults("");
 });
-ui.close.addEventListener("click", () => selectFlight(null, map));
+
+ui.close.addEventListener("click", () => {
+  selectFlight(null, map);
+  state.bbox = boundsToBBox(map);
+  refresh(map);
+});
+ui.follow.addEventListener("click", () => {
+  if (!state.selectedId) return;
+  state.following = !state.following;
+  const flight = state.flights.get(state.selectedId);
+  renderSheet(flight || null);
+  if (state.following && flight) {
+    selectFlight(state.selectedId, map, { fly: true, follow: true });
+    refresh(map, { silent: true });
+  }
+});
+
+ui.airborne.addEventListener("click", () => {
+  state.airborneOnly = !state.airborneOnly;
+  ui.airborne.setAttribute("aria-pressed", state.airborneOnly ? "true" : "false");
+  renderResults(ui.search.value);
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refresh(map);
+});

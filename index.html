@@ -15,11 +15,12 @@
   </head>
   <body>
     <div id="map"></div>
+    <div id="tip" class="tip" hidden></div>
 
     <header class="hud">
       <div class="brand">
         <p class="wordmark">Meridian</p>
-        <p class="tag">A quieter sky</p>
+        <p class="tag">Track a quieter sky</p>
       </div>
 
       <label class="search">
@@ -28,11 +29,14 @@
         <ul id="results" class="results" hidden></ul>
       </label>
 
-      <div id="status" class="status" data-state="idle">
-        <span class="pulse"></span>
-        <div>
-          <p id="status-label" class="status-label">Waiting for the map</p>
-          <p id="status-meta" class="status-meta">OpenSky live positions</p>
+      <div class="end">
+        <button type="button" id="airborne" class="chip" aria-pressed="true">Airborne</button>
+        <div id="status" class="status" data-state="idle">
+          <span class="pulse"></span>
+          <div>
+            <p id="status-label" class="status-label">Waiting for the map</p>
+            <p id="status-meta" class="status-meta">OpenSky live positions</p>
+          </div>
         </div>
       </div>
     </header>
@@ -43,6 +47,7 @@
       <h2 id="sheet-callsign"></h2>
       <p id="sheet-icao" class="icao"></p>
       <dl id="sheet-facts"></dl>
+      <button type="button" id="follow" class="follow" aria-pressed="false">Follow</button>
     </aside>
 
     <footer class="credit">
