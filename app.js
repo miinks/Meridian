@@ -12,6 +12,8 @@ const state = {
   creditsRemaining: null,
   authenticated: false,
   retryAt: 0,
+  quotaTimer: 0,
+  paused: false,
   inflight: false,
   programmaticMove: false,
 };
@@ -26,6 +28,7 @@ const ui = {
   close: document.getElementById("close"),
   follow: document.getElementById("follow"),
   airborne: document.getElementById("airborne"),
+  pause: document.getElementById("pause"),
   tip: document.getElementById("tip"),
 };
 
@@ -66,9 +69,75 @@ function formatVerticalRate(metersPerSecond, onGround) {
 }
 
 function formatWait(seconds) {
-  if (seconds >= 3600) return `${Math.ceil(seconds / 3600)}h`;
-  if (seconds >= 60) return `${Math.ceil(seconds / 60)}m`;
-  return `${Math.max(1, Math.round(seconds))}s`;
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return minutes < 10 && secs ? `${minutes}m ${secs}s` : `${minutes}m`;
+  return `${secs}s`;
+}
+
+function remainingWaitSeconds() {
+  return Math.max(0, Math.ceil((state.retryAt - Date.now()) / 1000));
+}
+
+function syncPauseButton() {
+  const paused = state.paused || remainingWaitSeconds() > 0;
+  ui.pause.setAttribute("aria-pressed", paused ? "true" : "false");
+  ui.pause.textContent = paused ? "Resume" : "Pause";
+}
+
+function canRequest() {
+  return !state.paused && remainingWaitSeconds() <= 0;
+}
+
+function setPaused(paused) {
+  state.paused = paused;
+  syncPauseButton();
+  if (paused) {
+    if (!showQuotaWait()) {
+      setStatus("idle", "Requests paused", "OpenSky calls stopped");
+    }
+    return;
+  }
+  if (showQuotaWait()) return;
+  refresh(map);
+}
+
+function showQuotaWait() {
+  const wait = remainingWaitSeconds();
+  if (wait <= 0) {
+    syncPauseButton();
+    return false;
+  }
+  const until = new Date(state.retryAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  setStatus("error", "OpenSky quota reached", `Try again in ${formatWait(wait)} · ${until}`);
+  syncPauseButton();
+  return true;
+}
+
+function armQuotaWait(seconds) {
+  const retry = Number(seconds);
+  state.retryAt = Date.now() + Math.max(1, Number.isFinite(retry) && retry > 0 ? retry : 60) * 1000;
+  state.paused = true;
+  showQuotaWait();
+  if (state.quotaTimer) clearInterval(state.quotaTimer);
+  state.quotaTimer = setInterval(() => {
+    if (showQuotaWait()) return;
+    clearInterval(state.quotaTimer);
+    state.quotaTimer = 0;
+    setStatus("idle", "Requests paused", "Click Resume to poll OpenSky");
+    syncPauseButton();
+  }, 1000);
+}
+
+function readRetryAfter(response, payload) {
+  const header = Number(response.headers.get("X-Rate-Limit-Retry-After-Seconds") || response.headers.get("Retry-After"));
+  const body = Number(payload?.retryAfterSeconds);
+  if (Number.isFinite(header) && header > 0) return header;
+  if (Number.isFinite(body) && body > 0) return body;
+  return 60;
 }
 
 function creditMeta() {
@@ -296,6 +365,11 @@ function renderResults(query, extra = []) {
 }
 
 async function fetchFlights({ bbox, icao24, worldwide } = {}) {
+  if (!canRequest()) {
+    const error = new Error("paused");
+    error.code = "paused";
+    throw error;
+  }
   const params = new URLSearchParams();
   if (icao24) params.set("icao24", icao24.toLowerCase());
   else if (bbox && !worldwide) {
@@ -310,14 +384,20 @@ async function fetchFlights({ bbox, icao24, worldwide } = {}) {
   const remaining = response.headers.get("X-Rate-Limit-Remaining");
   if (remaining != null && remaining !== "") state.creditsRemaining = Number(remaining);
 
+  const raw = await response.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+
   if (response.status === 429) {
-    const retry = Number(response.headers.get("X-Rate-Limit-Retry-After-Seconds") || 10);
-    state.retryAt = Date.now() + retry * 1000;
-    throw new Error(`OpenSky quota reached. Retry in ${formatWait(retry)}.`);
+    armQuotaWait(readRetryAfter(response, payload));
+    throw new Error("quota");
   }
   if (!response.ok) throw new Error(`OpenSky returned ${response.status}`);
-  const payload = await response.json();
-  return (payload.states || []).map(parseFlight).filter(Boolean);
+  return (payload?.states || []).map(parseFlight).filter(Boolean);
 }
 
 function ingest(next, { replace = true } = {}) {
@@ -352,9 +432,10 @@ function followCamera(map, flight) {
 async function refresh(map, { silent = false } = {}) {
   if (state.inflight || !state.bbox) return;
   if (document.hidden) return;
-  if (Date.now() < state.retryAt) {
-    const wait = Math.ceil((state.retryAt - Date.now()) / 1000);
-    setStatus("error", "Signal paused", `OpenSky retry in ${formatWait(wait)}`);
+  if (showQuotaWait()) return;
+  if (state.paused) {
+    setStatus("idle", "Requests paused", "OpenSky calls stopped");
+    syncPauseButton();
     return;
   }
 
@@ -395,6 +476,7 @@ async function refresh(map, { silent = false } = {}) {
     renderSheet(tracked || null);
     renderResults(ui.search.value);
   } catch (error) {
+    if (error.code === "paused" || showQuotaWait() || state.paused) return;
     setStatus("error", "Signal lost", error.message);
   } finally {
     state.inflight = false;
@@ -404,6 +486,7 @@ async function refresh(map, { silent = false } = {}) {
 async function searchWorldwide(map, query) {
   const needle = query.trim().toLowerCase();
   if (needle.length < 2 || state.inflight) return;
+  if (showQuotaWait() || state.paused) return;
 
   setStatus("loading", ICAO.test(needle) ? "Looking up ICAO" : "Scanning worldwide", "Uses extra OpenSky credits");
   ui.results.hidden = true;
@@ -433,6 +516,7 @@ async function searchWorldwide(map, query) {
       setStatus("error", "Not transmitting", creditMeta());
     }
   } catch (error) {
+    if (error.code === "paused" || showQuotaWait() || state.paused) return;
     setStatus("error", "Search failed", error.message);
   } finally {
     state.inflight = false;
@@ -658,6 +742,14 @@ ui.airborne.addEventListener("click", () => {
   state.airborneOnly = !state.airborneOnly;
   ui.airborne.setAttribute("aria-pressed", state.airborneOnly ? "true" : "false");
   renderResults(ui.search.value);
+});
+
+ui.pause.addEventListener("click", () => {
+  if (remainingWaitSeconds() > 0) {
+    showQuotaWait();
+    return;
+  }
+  setPaused(!state.paused);
 });
 
 document.addEventListener("visibilitychange", () => {

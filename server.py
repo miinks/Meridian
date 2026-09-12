@@ -69,11 +69,26 @@ class TokenManager:
 tokens = TokenManager()
 
 
-def copy_rate_headers(handler, headers):
+def retry_after_seconds(headers):
+    if not headers:
+        return None
+    raw = headers.get("X-Rate-Limit-Retry-After-Seconds") or headers.get("Retry-After")
+    try:
+        value = int(float(raw))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def rate_header_map(headers):
+    extra = {}
+    if not headers:
+        return extra
     for name in RATE_HEADERS:
         value = headers.get(name)
         if value:
-            handler.send_header(name, value)
+            extra[name] = value
+    return extra
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -90,11 +105,15 @@ class Handler(SimpleHTTPRequestHandler):
             return
         super().do_GET()
 
-    def send_json(self, status, payload):
+    def send_json(self, status, payload, extra_headers=None):
         body = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
+        if extra_headers:
+            for name, value in extra_headers.items():
+                if value is not None:
+                    self.send_header(name, str(value))
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -117,7 +136,8 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_response(response.status)
                     self.send_header("Content-Type", response.headers.get("Content-Type", "application/json"))
                     self.send_header("Cache-Control", "no-store")
-                    copy_rate_headers(self, response.headers)
+                    for name, value in rate_header_map(response.headers).items():
+                        self.send_header(name, value)
                     self.end_headers()
                     self.wfile.write(body)
                     return
@@ -126,10 +146,23 @@ class Handler(SimpleHTTPRequestHandler):
                     tokens.clear()
                     last_error = error
                     continue
+                extra = rate_header_map(error.headers)
+                if error.code == 429:
+                    retry = retry_after_seconds(error.headers)
+                    if retry is not None:
+                        extra["X-Rate-Limit-Retry-After-Seconds"] = str(retry)
+                    self.send_json(
+                        429,
+                        {"error": "Too many requests", "retryAfterSeconds": retry},
+                        extra_headers=extra,
+                    )
+                    return
                 body = error.read()
                 self.send_response(error.code)
                 self.send_header("Content-Type", "application/json")
-                copy_rate_headers(self, error.headers)
+                for name, value in extra.items():
+                    self.send_header(name, value)
+                self.send_header("Content-Length", str(len(body or b"")))
                 self.end_headers()
                 self.wfile.write(body or json.dumps({"error": str(error)}).encode())
                 return
@@ -140,9 +173,20 @@ class Handler(SimpleHTTPRequestHandler):
         if last_error:
             self.send_json(401, {"error": "OpenSky authentication failed"})
 
+    def end_headers(self):
+        if not urlparse(self.path).path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def log_message(self, format, *args):
-        if self.path.startswith("/api/") or args[1] != "200":
-            super().log_message(format, *args)
+        # Never let logging abort a response. A closed stderr pipe (background
+        # terminal) used to reset /api/* connections with an empty reply.
+        try:
+            status = args[1] if len(args) > 1 else ""
+            if self.path.startswith("/api/") or status != "200":
+                super().log_message(format, *args)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
