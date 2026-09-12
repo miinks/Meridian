@@ -184,6 +184,11 @@ dt {
   justify-self: end;
 }
 
+.chips {
+  display: flex;
+  gap: 8px;
+}
+
 .chip,
 .follow {
   border: 1px solid var(--line);
