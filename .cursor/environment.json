@@ -1,0 +1,17 @@
+{
+  "name": "Meridian",
+  "install": "python3 --version",
+  "terminals": [
+    {
+      "name": "meridian",
+      "command": "python3 server.py",
+      "description": "Meridian dev server: serves the static frontend and proxies the OpenSky API at http://127.0.0.1:5173. Runs anonymously unless OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET are set."
+    }
+  ],
+  "ports": [
+    {
+      "name": "meridian",
+      "port": 5173
+    }
+  ]
+}
