@@ -1,17 +1,26 @@
 {
-  "name": "Meridian",
-  "install": "python3 --version",
+  "name": "Meridian (React)",
+  "install": "cd meridian-react && npm install",
   "terminals": [
     {
-      "name": "meridian",
-      "command": "python3 server.py",
-      "description": "Meridian dev server: serves the static frontend and proxies the OpenSky API at http://127.0.0.1:5173. Runs anonymously unless OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET are set."
+      "name": "opensky-proxy",
+      "command": "PORT=8000 python3 server.py",
+      "description": "OpenSky API proxy (Python stdlib) on http://127.0.0.1:8000. Handles OAuth token refresh and rate-limit headers. Runs anonymously unless OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET are set."
+    },
+    {
+      "name": "meridian-web",
+      "command": "cd meridian-react && npm run dev",
+      "description": "Meridian React dev server (Vite) on http://127.0.0.1:5173. Proxies /api/* to the OpenSky proxy on :8000."
     }
   ],
   "ports": [
     {
-      "name": "meridian",
+      "name": "meridian-web",
       "port": 5173
+    },
+    {
+      "name": "opensky-proxy",
+      "port": 8000
     }
   ]
 }

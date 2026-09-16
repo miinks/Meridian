@@ -190,7 +190,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 5173
+    port = int(os.environ.get("PORT", "5173"))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     mode = "authenticated" if tokens.authenticated else "anonymous"
     print(f"Meridian is running at http://127.0.0.1:{port} ({mode} OpenSky)")
