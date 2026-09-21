@@ -35,6 +35,14 @@ export function selectedExpression(selectedId, selectedValue, fallback) {
   return ["case", ["==", ["get", "id"], selectedId || ""], selectedValue, fallback];
 }
 
+// Grow the plane emblems by a small margin as the map zooms out so they stay
+// legible at a wide POV, easing back to their normal size at closer zooms.
+const ZOOM_SIZE_SCALE = ["interpolate", ["linear"], ["zoom"], 3, 1.3, 7, 1.0];
+
+export function iconSizeExpression(selectedId) {
+  return ["*", selectedExpression(selectedId, 0.95, 0.62), ZOOM_SIZE_SCALE];
+}
+
 export function installMapLayers(map) {
   drawAircraftIcon(map, "plane", "#d7dde6");
   drawAircraftIcon(map, "plane-selected", "#e8c17a", true);
@@ -63,7 +71,7 @@ export function installMapLayers(map) {
       "icon-rotation-alignment": "map",
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
-      "icon-size": 0.62,
+      "icon-size": iconSizeExpression(null),
     },
     paint: {
       "icon-opacity": ["case", ["get", "onGround"], 0.28, 0.92],
