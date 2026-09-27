@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Serve Meridian and proxy OpenSky (browsers cannot call OpenSky directly)."""
+"""Proxy OpenSky for Meridian (browsers cannot call OpenSky directly).
+
+Serves the React production build from meridian-react/dist when present.
+In development the Vite app on :5173 is the site and this process is API-only.
+"""
 
 import json
 import os
@@ -11,6 +15,7 @@ from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
+DIST = ROOT / "meridian-react" / "dist"
 OPEN_SKY = "https://opensky-network.org/api"
 TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
 RATE_HEADERS = ("X-Rate-Limit-Remaining", "X-Rate-Limit-Retry-After-Seconds")
@@ -93,7 +98,8 @@ def rate_header_map(headers):
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(ROOT), **kwargs)
+        directory = str(DIST if DIST.is_dir() else ROOT)
+        super().__init__(*args, directory=directory, **kwargs)
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -103,7 +109,16 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path.startswith("/api/opensky"):
             self.proxy_opensky(parsed)
             return
-        super().do_GET()
+        if DIST.is_dir():
+            super().do_GET()
+            return
+        self.send_json(
+            404,
+            {
+                "error": "Meridian is the React app in meridian-react. "
+                "Run npm run dev there, or npm run build to serve dist from this server."
+            },
+        )
 
     def send_json(self, status, payload, extra_headers=None):
         body = json.dumps(payload).encode()
@@ -190,8 +205,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5173"))
+    port = int(os.environ.get("PORT", "8000"))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     mode = "authenticated" if tokens.authenticated else "anonymous"
-    print(f"Meridian is running at http://127.0.0.1:{port} ({mode} OpenSky)")
+    frontend = f"serving {DIST}" if DIST.is_dir() else "API only; site is meridian-react (Vite :5173)"
+    print(f"Meridian proxy at http://127.0.0.1:{port} ({mode} OpenSky, {frontend})")
     server.serve_forever()
