@@ -1,13 +1,12 @@
-# Meridian (React)
+# Meridian
 
-A React + Vite rebuild of Meridian — a quieter live flight map powered by
+A quieter live flight map powered by
 [OpenSky Network](https://opensky-network.org) positions and
 [OpenFreeMap](https://openfreemap.org) tiles via MapLibre GL.
 
-This is a faithful port of the original vanilla-JS app in the repository root.
-All behaviour is preserved: live polling, bounding-box + worldwide search,
-pause/resume with rate-limit handling, airborne-only filtering, follow mode,
-trails, animated interpolation, and the flight detail sheet.
+Live polling, bounding-box + worldwide search, pause/resume with rate-limit
+handling, airborne-only filtering, follow mode, trails, animated interpolation,
+and the flight detail sheet.
 
 ## Architecture
 
