@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import { installMapLayers } from "./lib/map.js";
+import { AIRPORT_LAYERS, installMapLayers, loadAirports } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
 import Sheet from "./components/Sheet.jsx";
@@ -36,8 +36,14 @@ export default function App() {
       if (!document.hidden) controllerRef.current?.refresh();
     };
 
-    map.on("load", () => {
-      installMapLayers(map);
+    map.on("load", async () => {
+      let airports;
+      try {
+        airports = await loadAirports();
+      } catch {
+        airports = undefined;
+      }
+      installMapLayers(map, airports);
 
       const controller = new MeridianController(map, {
         onStatus: setStatus,
@@ -61,6 +67,16 @@ export default function App() {
         map.getCanvas().style.cursor = "";
         controller.hideTip();
       });
+      for (const layer of AIRPORT_LAYERS) {
+        map.on("mouseenter", layer, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mousemove", layer, (event) => controller.showAirportTip(event));
+        map.on("mouseleave", layer, () => {
+          map.getCanvas().style.cursor = "";
+          controller.hideTip();
+        });
+      }
 
       document.addEventListener("visibilitychange", handleVisibility);
       controller.boot();

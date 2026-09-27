@@ -493,6 +493,15 @@ export class MeridianController {
     this.cb.onTip({ visible: true, text: callsign, x: event.point.x, y: event.point.y });
   }
 
+  showAirportTip(event) {
+    const props = event.features?.[0]?.properties;
+    if (!props) return this.hideTip();
+    const code = props.iata || props.ident;
+    const text = code && props.name ? `${code} · ${props.name}` : props.name || code;
+    if (!text) return this.hideTip();
+    this.cb.onTip({ visible: true, text, x: event.point.x, y: event.point.y });
+  }
+
   hideTip() {
     this.cb.onTip({ visible: false, text: "", x: 0, y: 0 });
   }
