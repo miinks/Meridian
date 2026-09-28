@@ -4,3 +4,5 @@ dist
 credentials.json
 .env
 __pycache__/
+data/aircraft-types.json
+data/icao-typecode.json

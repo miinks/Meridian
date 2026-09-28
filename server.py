@@ -5,6 +5,7 @@ Serves the React production build from meridian-react/dist when present.
 In development the Vite app on :5173 is the site and this process is API-only.
 """
 
+import gzip
 import json
 import os
 import time
@@ -19,6 +20,47 @@ DIST = ROOT / "meridian-react" / "dist"
 OPEN_SKY = "https://opensky-network.org/api"
 TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
 RATE_HEADERS = ("X-Rate-Limit-Remaining", "X-Rate-Limit-Retry-After-Seconds")
+
+
+def load_aircraft_db():
+    icao_path = ROOT / "data" / "icao-typecode.json.gz"
+    names_path = ROOT / "data" / "typecode-names.json"
+    icao_map, names = {}, {}
+    if icao_path.exists():
+        with gzip.open(icao_path, "rt", encoding="utf-8") as handle:
+            icao_map = json.load(handle)
+    if names_path.exists():
+        names = json.loads(names_path.read_text(encoding="utf-8"))
+    return icao_map, names
+
+
+ICAO_TYPECODES, TYPECODE_NAMES = load_aircraft_db()
+
+
+def enrich_states(body):
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return body
+    states = payload.get("states")
+    if not states or not ICAO_TYPECODES:
+        return body
+    aircraft = {}
+    for row in states:
+        if not row:
+            continue
+        icao = (row[0] or "").lower()
+        typecode = ICAO_TYPECODES.get(icao)
+        if not typecode:
+            continue
+        names = TYPECODE_NAMES.get(typecode) or {}
+        aircraft[icao] = {
+            "typecode": typecode,
+            "model": names.get("m") or "",
+            "manufacturer": names.get("n") or "",
+        }
+    payload["aircraft"] = aircraft
+    return json.dumps(payload).encode()
 
 
 def load_credentials():
@@ -148,6 +190,8 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 with urlopen(request, timeout=20) as response:
                     body = response.read()
+                    if "/states/" in parsed.path:
+                        body = enrich_states(body)
                     self.send_response(response.status)
                     self.send_header("Content-Type", response.headers.get("Content-Type", "application/json"))
                     self.send_header("Cache-Control", "no-store")
@@ -209,5 +253,5 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     mode = "authenticated" if tokens.authenticated else "anonymous"
     frontend = f"serving {DIST}" if DIST.is_dir() else "API only; site is meridian-react (Vite :5173)"
-    print(f"Meridian proxy at http://127.0.0.1:{port} ({mode} OpenSky, {frontend})")
+    print(f"Meridian proxy at http://127.0.0.1:{port} ({mode} OpenSky, {frontend}, {len(ICAO_TYPECODES):,} aircraft types)")
     server.serve_forever()

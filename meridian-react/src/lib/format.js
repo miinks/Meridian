@@ -1,3 +1,5 @@
+import { lookupAirline, aircraftIcon } from "./identity.js";
+
 export const POLL_MS = 10_000;
 export const EMPTY = { type: "FeatureCollection", features: [] };
 export const ICAO = /^[a-f0-9]{6}$/i;
@@ -41,11 +43,14 @@ export function formatWait(seconds) {
 }
 
 export function parseFlight(row) {
-  const [id, rawCallsign, country, , , lon, lat, altitude, onGround, speed, heading, verticalRate, , , squawk] = row;
+  const [id, rawCallsign, country, , , lon, lat, altitude, onGround, speed, heading, verticalRate, , , squawk, , , category] =
+    row;
   if (lon == null || lat == null) return null;
+  const callsign = (rawCallsign || "").trim() || id.toUpperCase();
+  const airline = lookupAirline(callsign);
   return {
     id,
-    callsign: (rawCallsign || "").trim() || id.toUpperCase(),
+    callsign,
     country,
     longitude: lon,
     latitude: lat,
@@ -55,6 +60,10 @@ export function parseFlight(row) {
     heading: heading ?? 0,
     verticalRateMs: verticalRate,
     squawk,
+    category,
+    airlineName: airline?.name || "",
+    airlineFlight: airline?.flight || "",
+    icon: aircraftIcon(category),
   };
 }
 
@@ -80,5 +89,7 @@ export function aroundFlight(flight, deg = 1.1) {
 }
 
 export function matchesQuery(flight, needle) {
-  return flight.callsign.toLowerCase().includes(needle) || flight.id.toLowerCase().includes(needle);
+  if (flight.callsign.toLowerCase().includes(needle) || flight.id.toLowerCase().includes(needle)) return true;
+  const airline = (flight.airlineName || "").toLowerCase();
+  return airline.includes(needle);
 }

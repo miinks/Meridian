@@ -12,7 +12,8 @@ import {
   aroundFlight,
   matchesQuery,
 } from "./format.js";
-import { selectedExpression, iconSizeExpression } from "./map.js";
+import { iconImageExpression, iconSizeExpression } from "./map.js";
+import { formatAircraft, iconFromTypecode } from "./identity.js";
 
 const noop = () => {};
 
@@ -50,6 +51,7 @@ export class MeridianController {
     this.inflight = false;
     this.programmaticMove = false;
     this.searchValue = "";
+    this.aircraftCache = new Map();
   }
 
   // ---- quota + pause -------------------------------------------------------
@@ -192,8 +194,19 @@ export class MeridianController {
     }
 
     const callsign = flight?.callsign || this.selectedId?.toUpperCase() || "Flight";
+    const info = flight
+      ? this.aircraftCache.get(flight.id) || {
+          model: flight.model,
+          typecode: flight.typecode,
+          manufacturer: flight.manufacturer,
+          operator: flight.airlineName,
+        }
+      : undefined;
+    const airline = flight?.airlineName || info?.operator || "";
     const facts = flight
       ? [
+          ["Flight", flight.airlineFlight || flight.callsign],
+          ["Aircraft", formatAircraft(info, flight.category)],
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
@@ -202,6 +215,8 @@ export class MeridianController {
           ["Country", flight.country],
         ]
       : [
+          ["Flight", "—"],
+          ["Aircraft", "Locating…"],
           ["Altitude", "Locating…"],
           ["Speed", "—"],
           ["Heading", "—"],
@@ -221,6 +236,7 @@ export class MeridianController {
     this.cb.onSheet({
       eyebrow,
       callsign,
+      airline,
       icao: (flight?.id || this.selectedId || "").toUpperCase(),
       facts,
       following: this.following,
@@ -238,9 +254,11 @@ export class MeridianController {
     this.syncUrl();
 
     if (this.map.getLayer("flights")) {
-      this.map.setLayoutProperty("flights", "icon-image", selectedExpression(id, "plane-selected", "plane"));
+      this.map.setLayoutProperty("flights", "icon-image", iconImageExpression(id));
       this.map.setLayoutProperty("flights", "icon-size", iconSizeExpression(id));
     }
+
+    if (id) this.lookupAircraft(id);
 
     if (fly && flight) {
       this.programmaticMove = true;
@@ -251,6 +269,29 @@ export class MeridianController {
         offset: this.sheetOffset(),
       });
     }
+  }
+
+  async lookupAircraft(id) {
+    if (!id || this.aircraftCache.has(id)) return;
+    try {
+      const response = await fetch(`https://api.adsbdb.com/v0/aircraft/${id.toLowerCase()}`);
+      const payload = await response.json();
+      const ac = payload?.response?.aircraft;
+      if (!response.ok || !ac || typeof ac !== "object") {
+        this.aircraftCache.set(id, null);
+        return;
+      }
+      this.aircraftCache.set(id, {
+        model: (ac.type || ac.icao_type || "").trim(),
+        typecode: (ac.icao_type || "").trim(),
+        manufacturer: (ac.manufacturer || "").trim(),
+        operator: (ac.registered_owner || "").trim(),
+        registration: (ac.registration || "").trim(),
+      });
+    } catch {
+      this.aircraftCache.set(id, null);
+    }
+    if (id === this.selectedId) this.renderSheet(this.flights.get(id) || null);
   }
 
   // ---- results dropdown ----------------------------------------------------
@@ -274,7 +315,7 @@ export class MeridianController {
         kind: "flight",
         id: flight.id,
         callsign: flight.callsign,
-        country: flight.country || "",
+        country: flight.airlineName || flight.country || "",
       })),
       ...extra,
     ];
@@ -321,7 +362,22 @@ export class MeridianController {
       throw new Error("quota");
     }
     if (!response.ok) throw new Error(`OpenSky returned ${response.status}`);
-    return (payload?.states || []).map(parseFlight).filter(Boolean);
+    const extras = payload?.aircraft || {};
+    return (payload?.states || [])
+      .map(parseFlight)
+      .filter(Boolean)
+      .map((flight) => {
+        const extra = extras[flight.id] || extras[flight.id?.toLowerCase()];
+        if (!extra) return flight;
+        const typecode = extra.typecode || "";
+        return {
+          ...flight,
+          typecode,
+          model: extra.model || "",
+          manufacturer: extra.manufacturer || "",
+          icon: iconFromTypecode(typecode) || flight.icon,
+        };
+      });
   }
 
   followCamera(flight) {
@@ -457,6 +513,7 @@ export class MeridianController {
           callsign: flight.callsign,
           heading: flight.heading,
           onGround: flight.onGround,
+          icon: flight.icon || "jet",
         },
         geometry: {
           type: "Point",
@@ -490,7 +547,14 @@ export class MeridianController {
   showTip(event) {
     const callsign = event.features?.[0]?.properties?.callsign;
     if (!callsign) return this.hideTip();
-    this.cb.onTip({ visible: true, text: callsign, x: event.point.x, y: event.point.y });
+    const flight = this.flights.get(event.features[0].properties.id);
+    const airline = flight?.airlineName;
+    this.cb.onTip({
+      visible: true,
+      text: airline ? `${callsign} · ${airline}` : callsign,
+      x: event.point.x,
+      y: event.point.y,
+    });
   }
 
   hideTip() {

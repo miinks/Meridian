@@ -8,6 +8,7 @@ export default function Sheet({ sheet, onClose, onToggleFollow }) {
       </button>
       <p className="eyebrow">{sheet.eyebrow}</p>
       <h2>{sheet.callsign}</h2>
+      {sheet.airline ? <p className="airline">{sheet.airline}</p> : null}
       <p className="icao">{sheet.icao}</p>
       <dl>
         {sheet.facts.map(([label, value]) => (

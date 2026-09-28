@@ -272,6 +272,13 @@ dt {
   letter-spacing: -0.03em;
 }
 
+.airline {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
 .icao {
   margin: 2px 0 22px;
 }
