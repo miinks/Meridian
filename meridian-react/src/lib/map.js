@@ -135,7 +135,12 @@ export function planeImageExpression(selectedId) {
 }
 
 export function planeSizeExpression(selectedId) {
-  return ["*", ["get", "iconSize"], ["case", ["==", ["get", "id"], selectedId || ""], 1.38, 1]];
+  return [
+    "*",
+    ["get", "iconSize"],
+    ["interpolate", ["linear"], ["zoom"], 2, 2.15, 5, 1.55, 8, 1.18, 12, 1],
+    ["case", ["==", ["get", "id"], selectedId || ""], 1.32, 1],
+  ];
 }
 
 export function installMapLayers(map, airports = EMPTY) {

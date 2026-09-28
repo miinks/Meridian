@@ -75,21 +75,21 @@ export function planeIconSize(category) {
     case 10:
     case 12:
     case 14:
-      return 0.42;
+      return 0.58;
     case 3:
-      return 0.54;
+      return 0.74;
     case 4:
-      return 0.7;
+      return 0.96;
     case 5:
-      return 0.78;
+      return 1.06;
     case 6:
-      return 0.92;
+      return 1.22;
     case 7:
-      return 0.58;
+      return 0.8;
     case 8:
-      return 0.5;
+      return 0.7;
     default:
-      return 0.58;
+      return 0.8;
   }
 }
 
