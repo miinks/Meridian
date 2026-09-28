@@ -12,7 +12,7 @@ import {
   aroundFlight,
   matchesQuery,
 } from "./format.js";
-import { selectedExpression } from "./map.js";
+import { selectedExpression, iconSizeExpression } from "./map.js";
 
 const noop = () => {};
 
@@ -239,7 +239,7 @@ export class MeridianController {
 
     if (this.map.getLayer("flights")) {
       this.map.setLayoutProperty("flights", "icon-image", selectedExpression(id, "plane-selected", "plane"));
-      this.map.setLayoutProperty("flights", "icon-size", selectedExpression(id, 0.95, 0.62));
+      this.map.setLayoutProperty("flights", "icon-size", iconSizeExpression(id));
     }
 
     if (fly && flight) {

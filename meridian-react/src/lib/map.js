@@ -35,6 +35,19 @@ export function selectedExpression(selectedId, selectedValue, fallback) {
   return ["case", ["==", ["get", "id"], selectedId || ""], selectedValue, fallback];
 }
 
+// Grow the plane emblems by a small margin as the map zooms out so they stay
+// legible at a wide POV, easing back to their normal size at closer zooms.
+// "zoom" must be the input to a top-level interpolate, so the per-selection
+// base sizes (0.62 normal, 0.95 selected) are baked into each zoom stop.
+const ZOOM_OUT = 3; // fully enlarged at/below this zoom
+const ZOOM_IN = 7; // normal size at/above this zoom
+const OUT_SCALE = 1.3;
+
+export function iconSizeExpression(selectedId) {
+  const sizeAt = (factor) => selectedExpression(selectedId, 0.95 * factor, 0.62 * factor);
+  return ["interpolate", ["linear"], ["zoom"], ZOOM_OUT, sizeAt(OUT_SCALE), ZOOM_IN, sizeAt(1)];
+}
+
 export function installMapLayers(map) {
   drawAircraftIcon(map, "plane", "#d7dde6");
   drawAircraftIcon(map, "plane-selected", "#e8c17a", true);
@@ -63,7 +76,7 @@ export function installMapLayers(map) {
       "icon-rotation-alignment": "map",
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
-      "icon-size": 0.62,
+      "icon-size": iconSizeExpression(null),
     },
     paint: {
       "icon-opacity": ["case", ["get", "onGround"], 0.28, 0.92],
