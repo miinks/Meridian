@@ -139,11 +139,20 @@ dt {
   color: var(--accent);
 }
 
+.results .airport span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .results {
   position: absolute;
   left: 0;
   right: 0;
   top: calc(100% + 8px);
+  max-height: min(360px, 55vh);
+  overflow: auto;
   margin: 0;
   padding: 6px;
   list-style: none;
@@ -272,8 +281,18 @@ dt {
   letter-spacing: -0.03em;
 }
 
+.airline {
+  margin: 4px 0 0;
+  color: var(--accent);
+  font-size: 14px;
+}
+
 .icao {
   margin: 2px 0 22px;
+}
+
+.airline + .icao {
+  margin-top: 2px;
 }
 
 .sheet dl {

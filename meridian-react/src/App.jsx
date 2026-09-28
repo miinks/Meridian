@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import { AIRPORT_LAYERS, installMapLayers, loadAirports } from "./lib/map.js";
+import { loadAirlines } from "./lib/format.js";
+import { AIRPORT_LAYERS, airportIndex, installMapLayers, loadAirports } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
 import Sheet from "./components/Sheet.jsx";
@@ -38,10 +39,16 @@ export default function App() {
 
     map.on("load", async () => {
       let airports;
+      let airlines;
       try {
         airports = await loadAirports();
       } catch {
         airports = undefined;
+      }
+      try {
+        airlines = await loadAirlines();
+      } catch {
+        airlines = undefined;
       }
       installMapLayers(map, airports);
 
@@ -53,6 +60,8 @@ export default function App() {
         onTip: setTip,
         onSearchValue: setSearchValue,
       });
+      if (airports) controller.setAirports(airportIndex(airports));
+      if (airlines) controller.setAirlines(airlines);
       controllerRef.current = controller;
 
       map.on("moveend", () => controller.handleMoveEnd());
@@ -105,6 +114,7 @@ export default function App() {
         onSearchSubmit={() => controllerRef.current?.submitSearch()}
         results={results}
         onPickResult={(id) => controllerRef.current?.pickResult(id)}
+        onPickAirport={(ident) => controllerRef.current?.pickAirport(ident)}
         onWorldwide={() => controllerRef.current?.searchWorldwide()}
         paused={paused}
         airborneOnly={airborneOnly}

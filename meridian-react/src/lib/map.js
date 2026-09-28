@@ -19,6 +19,17 @@ export async function loadAirports() {
   return airportsToGeoJSON(await response.json());
 }
 
+export function airportIndex(collection) {
+  return (collection?.features || []).map((feature) => ({
+    ident: feature.properties.ident || "",
+    iata: feature.properties.iata || "",
+    name: feature.properties.name || "",
+    type: feature.properties.type || "S",
+    longitude: feature.geometry.coordinates[0],
+    latitude: feature.geometry.coordinates[1],
+  }));
+}
+
 function airportCircle(id, types, minzoom, radius, fill, stroke) {
   return {
     id,
