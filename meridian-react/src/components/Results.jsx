@@ -1,4 +1,4 @@
-export default function Results({ results, onPick, onWorldwide }) {
+export default function Results({ results, onPick, onPickAirport, onWorldwide }) {
   const { items, visible } = results;
   if (!visible) return null;
 
@@ -7,10 +7,20 @@ export default function Results({ results, onPick, onWorldwide }) {
       {items.map((item, index) => {
         if (item.kind === "flight") {
           return (
-            <li key={item.id}>
+            <li key={`flight-${item.id}`}>
               <button type="button" onClick={() => onPick(item.id)}>
                 <strong>{item.callsign}</strong>
-                <span>{item.country}</span>
+                <span>{item.airline || item.country}</span>
+              </button>
+            </li>
+          );
+        }
+        if (item.kind === "airport") {
+          return (
+            <li key={`airport-${item.id}`}>
+              <button type="button" className="airport" onClick={() => onPickAirport(item.id)}>
+                <strong>{item.code}</strong>
+                <span>{item.name}</span>
               </button>
             </li>
           );

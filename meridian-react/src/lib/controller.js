@@ -8,11 +8,17 @@ import {
   formatVerticalRate,
   formatWait,
   parseFlight,
+  planeKind,
+  planeIconSize,
+  formatCategory,
   boundsToBBox,
   aroundFlight,
   matchesQuery,
+  airlineFromCallsign,
+  matchesAirport,
+  rankAirport,
 } from "./format.js";
-import { selectedExpression } from "./map.js";
+import { planeImageExpression, planeSizeExpression } from "./map.js";
 
 const noop = () => {};
 
@@ -48,6 +54,8 @@ export class MeridianController {
     this.rafId = 0;
     this.paused = false;
     this.inflight = false;
+    this.airports = [];
+    this.airlines = {};
     this.programmaticMove = false;
     this.searchValue = "";
   }
@@ -161,6 +169,7 @@ export class MeridianController {
       const previous = this.flights.get(flight.id);
       nextMap.set(flight.id, {
         ...flight,
+        category: flight.category || previous?.category || 0,
         prevLongitude: previous?.longitude ?? flight.longitude,
         prevLatitude: previous?.latitude ?? flight.latitude,
         receivedAt: now,
@@ -192,12 +201,14 @@ export class MeridianController {
     }
 
     const callsign = flight?.callsign || this.selectedId?.toUpperCase() || "Flight";
+    const airline = this.airlineName(callsign);
     const facts = flight
       ? [
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
           ["Vertical", formatVerticalRate(flight.verticalRateMs, flight.onGround)],
+          ["Type", formatCategory(flight.category)],
           ["Squawk", flight.squawk || "—"],
           ["Country", flight.country],
         ]
@@ -206,6 +217,7 @@ export class MeridianController {
           ["Speed", "—"],
           ["Heading", "—"],
           ["Vertical", "—"],
+          ["Type", "—"],
           ["Squawk", "—"],
           ["Country", "—"],
         ];
@@ -221,11 +233,12 @@ export class MeridianController {
     this.cb.onSheet({
       eyebrow,
       callsign,
+      airline,
       icao: (flight?.id || this.selectedId || "").toUpperCase(),
       facts,
       following: this.following,
     });
-    document.title = `${callsign} · Meridian`;
+    document.title = airline ? `${callsign} · ${airline} · Meridian` : `${callsign} · Meridian`;
   }
 
   selectFlight(id, { fly = false, follow = false } = {}) {
@@ -238,8 +251,8 @@ export class MeridianController {
     this.syncUrl();
 
     if (this.map.getLayer("flights")) {
-      this.map.setLayoutProperty("flights", "icon-image", selectedExpression(id, "plane-selected", "plane"));
-      this.map.setLayoutProperty("flights", "icon-size", selectedExpression(id, 0.95, 0.62));
+      this.map.setLayoutProperty("flights", "icon-image", planeImageExpression(id));
+      this.map.setLayoutProperty("flights", "icon-size", planeSizeExpression(id));
     }
 
     if (fly && flight) {
@@ -255,6 +268,29 @@ export class MeridianController {
 
   // ---- results dropdown ----------------------------------------------------
 
+  setAirports(airports) {
+    this.airports = airports || [];
+    if (this.searchValue) this.renderResults(this.searchValue);
+  }
+
+  setAirlines(airlines) {
+    this.airlines = airlines || {};
+    if (this.searchValue) this.renderResults(this.searchValue);
+    if (this.selectedId) this.renderSheet(this.flights.get(this.selectedId) || null);
+  }
+
+  airlineName(callsign) {
+    return airlineFromCallsign(callsign, this.airlines);
+  }
+
+  matchingAirports(needle) {
+    if (needle.length < 2) return [];
+    return this.airports
+      .filter((airport) => matchesAirport(airport, needle))
+      .sort((left, right) => rankAirport(left, needle) - rankAirport(right, needle))
+      .slice(0, 8);
+  }
+
   setSearchValue(value) {
     this.searchValue = value;
     this.renderResults(value);
@@ -267,14 +303,26 @@ export class MeridianController {
       return;
     }
 
-    const matches =
-      needle.length < 2 ? [] : this.visibleFlights().filter((flight) => matchesQuery(flight, needle)).slice(0, 6);
+    const flights =
+      needle.length < 2
+        ? []
+        : this.visibleFlights()
+            .filter((flight) => matchesQuery(flight, needle, this.airlines))
+            .slice(0, 6);
+    const airports = this.matchingAirports(needle);
     const items = [
-      ...matches.map((flight) => ({
+      ...flights.map((flight) => ({
         kind: "flight",
         id: flight.id,
         callsign: flight.callsign,
+        airline: this.airlineName(flight.callsign),
         country: flight.country || "",
+      })),
+      ...airports.map((airport) => ({
+        kind: "airport",
+        id: airport.ident,
+        code: airport.iata || airport.ident,
+        name: airport.name,
       })),
       ...extra,
     ];
@@ -295,6 +343,7 @@ export class MeridianController {
       throw error;
     }
     const params = new URLSearchParams();
+    params.set("extended", "1");
     if (icao24) params.set("icao24", icao24.toLowerCase());
     else if (bbox && !worldwide) {
       params.set("lamin", String(bbox.south));
@@ -374,7 +423,8 @@ export class MeridianController {
       if (this.selectedId && !tracked) {
         this.setStatus("error", "Not transmitting", this.creditMeta());
       } else if (this.following && tracked) {
-        this.setStatus("live", `Tracking ${tracked.callsign}`, this.creditMeta());
+        const airline = this.airlineName(tracked.callsign);
+        this.setStatus("live", `Tracking ${tracked.callsign}`, airline ? `${airline} · ${this.creditMeta()}` : this.creditMeta());
         this.followCamera(tracked);
       } else {
         this.setStatus(
@@ -412,7 +462,7 @@ export class MeridianController {
       const next = ICAO.test(needle)
         ? await this.fetchFlights({ icao24: needle })
         : await this.fetchFlights({ worldwide: true });
-      const matches = next.filter((flight) => matchesQuery(flight, needle));
+      const matches = next.filter((flight) => matchesQuery(flight, needle, this.airlines));
 
       if (matches.length === 1) {
         this.ingest(matches, { replace: false });
@@ -457,6 +507,8 @@ export class MeridianController {
           callsign: flight.callsign,
           heading: flight.heading,
           onGround: flight.onGround,
+          kind: planeKind(flight.category),
+          iconSize: planeIconSize(flight.category),
         },
         geometry: {
           type: "Point",
@@ -490,7 +542,22 @@ export class MeridianController {
   showTip(event) {
     const callsign = event.features?.[0]?.properties?.callsign;
     if (!callsign) return this.hideTip();
-    this.cb.onTip({ visible: true, text: callsign, x: event.point.x, y: event.point.y });
+    const airline = this.airlineName(callsign);
+    this.cb.onTip({
+      visible: true,
+      text: airline ? `${callsign} · ${airline}` : callsign,
+      x: event.point.x,
+      y: event.point.y,
+    });
+  }
+
+  showAirportTip(event) {
+    const props = event.features?.[0]?.properties;
+    if (!props) return this.hideTip();
+    const code = props.iata || props.ident;
+    const text = code && props.name ? `${code} · ${props.name}` : props.name || code;
+    if (!text) return this.hideTip();
+    this.cb.onTip({ visible: true, text, x: event.point.x, y: event.point.y });
   }
 
   hideTip() {
@@ -523,14 +590,31 @@ export class MeridianController {
 
   submitSearch() {
     const needle = this.searchValue.trim().toLowerCase();
-    const matches = this.visibleFlights().filter((flight) => matchesQuery(flight, needle));
-    if (matches.length === 1) {
-      this.selectFlight(matches[0].id, { fly: true, follow: true });
+    if (needle.length < 2) return;
+
+    const exactAirports = this.airports.filter(
+      (airport) => airport.iata.toLowerCase() === needle || airport.ident.toLowerCase() === needle,
+    );
+    if (exactAirports.length === 1) {
+      this.pickAirport(exactAirports[0].ident);
+      return;
+    }
+
+    const flights = this.visibleFlights().filter((flight) => matchesQuery(flight, needle, this.airlines));
+    if (flights.length === 1) {
+      this.selectFlight(flights[0].id, { fly: true, follow: true });
       this.searchValue = "";
       this.cb.onSearchValue("");
       this.renderResults("");
       return;
     }
+
+    const airports = this.matchingAirports(needle);
+    if (airports.length === 1 && flights.length === 0) {
+      this.pickAirport(airports[0].ident);
+      return;
+    }
+
     this.searchWorldwide(this.searchValue);
   }
 
@@ -539,6 +623,25 @@ export class MeridianController {
     this.searchValue = "";
     this.cb.onSearchValue("");
     this.renderResults("");
+  }
+
+  pickAirport(ident) {
+    const airport = this.airports.find((item) => item.ident === ident);
+    if (!airport) return;
+
+    this.selectFlight(null);
+    this.following = false;
+    this.programmaticMove = true;
+    const zoom = airport.type === "L" ? 10 : airport.type === "M" ? 11.2 : 12.4;
+    this.map.easeTo({
+      center: [airport.longitude, airport.latitude],
+      zoom: Math.max(this.map.getZoom(), zoom),
+      duration: 900,
+    });
+    this.searchValue = "";
+    this.cb.onSearchValue("");
+    this.renderResults("");
+    this.setStatus("live", airport.iata || airport.ident, airport.name);
   }
 
   // ---- map event handlers --------------------------------------------------
