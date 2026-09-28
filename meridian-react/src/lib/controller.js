@@ -8,6 +8,9 @@ import {
   formatVerticalRate,
   formatWait,
   parseFlight,
+  planeKind,
+  planeIconSize,
+  formatCategory,
   boundsToBBox,
   aroundFlight,
   matchesQuery,
@@ -15,7 +18,7 @@ import {
   matchesAirport,
   rankAirport,
 } from "./format.js";
-import { selectedExpression } from "./map.js";
+import { planeImageExpression, planeSizeExpression } from "./map.js";
 
 const noop = () => {};
 
@@ -166,6 +169,7 @@ export class MeridianController {
       const previous = this.flights.get(flight.id);
       nextMap.set(flight.id, {
         ...flight,
+        category: flight.category || previous?.category || 0,
         prevLongitude: previous?.longitude ?? flight.longitude,
         prevLatitude: previous?.latitude ?? flight.latitude,
         receivedAt: now,
@@ -204,6 +208,7 @@ export class MeridianController {
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
           ["Vertical", formatVerticalRate(flight.verticalRateMs, flight.onGround)],
+          ["Type", formatCategory(flight.category)],
           ["Squawk", flight.squawk || "—"],
           ["Country", flight.country],
         ]
@@ -212,6 +217,7 @@ export class MeridianController {
           ["Speed", "—"],
           ["Heading", "—"],
           ["Vertical", "—"],
+          ["Type", "—"],
           ["Squawk", "—"],
           ["Country", "—"],
         ];
@@ -245,8 +251,8 @@ export class MeridianController {
     this.syncUrl();
 
     if (this.map.getLayer("flights")) {
-      this.map.setLayoutProperty("flights", "icon-image", selectedExpression(id, "plane-selected", "plane"));
-      this.map.setLayoutProperty("flights", "icon-size", selectedExpression(id, 0.95, 0.62));
+      this.map.setLayoutProperty("flights", "icon-image", planeImageExpression(id));
+      this.map.setLayoutProperty("flights", "icon-size", planeSizeExpression(id));
     }
 
     if (fly && flight) {
@@ -337,6 +343,7 @@ export class MeridianController {
       throw error;
     }
     const params = new URLSearchParams();
+    params.set("extended", "1");
     if (icao24) params.set("icao24", icao24.toLowerCase());
     else if (bbox && !worldwide) {
       params.set("lamin", String(bbox.south));
@@ -500,6 +507,8 @@ export class MeridianController {
           callsign: flight.callsign,
           heading: flight.heading,
           onGround: flight.onGround,
+          kind: planeKind(flight.category),
+          iconSize: planeIconSize(flight.category),
         },
         geometry: {
           type: "Point",

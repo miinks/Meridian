@@ -41,8 +41,10 @@ export function formatWait(seconds) {
 }
 
 export function parseFlight(row) {
-  const [id, rawCallsign, country, , , lon, lat, altitude, onGround, speed, heading, verticalRate, , , squawk] = row;
+  const [id, rawCallsign, country, , , lon, lat, altitude, onGround, speed, heading, verticalRate, , , squawk, , category] =
+    row;
   if (lon == null || lat == null) return null;
+  const cat = Number(category);
   return {
     id,
     callsign: (rawCallsign || "").trim() || id.toUpperCase(),
@@ -55,7 +57,69 @@ export function parseFlight(row) {
     heading: heading ?? 0,
     verticalRateMs: verticalRate,
     squawk,
+    category: Number.isFinite(cat) ? cat : 0,
   };
+}
+
+export function planeKind(category) {
+  if (category === 8) return "rotor";
+  if (category === 2 || category === 9 || category === 10 || category === 12 || category === 14) return "light";
+  if (category === 4 || category === 5 || category === 6) return "heavy";
+  return "medium";
+}
+
+export function planeIconSize(category) {
+  switch (category) {
+    case 2:
+    case 9:
+    case 10:
+    case 12:
+    case 14:
+      return 0.42;
+    case 3:
+      return 0.54;
+    case 4:
+      return 0.7;
+    case 5:
+      return 0.78;
+    case 6:
+      return 0.92;
+    case 7:
+      return 0.58;
+    case 8:
+      return 0.5;
+    default:
+      return 0.58;
+  }
+}
+
+export function formatCategory(category) {
+  switch (category) {
+    case 2:
+      return "Light";
+    case 3:
+      return "Small";
+    case 4:
+      return "Large";
+    case 5:
+      return "High vortex";
+    case 6:
+      return "Heavy";
+    case 7:
+      return "High performance";
+    case 8:
+      return "Rotorcraft";
+    case 9:
+      return "Glider";
+    case 10:
+      return "Lighter-than-air";
+    case 12:
+      return "Ultralight";
+    case 14:
+      return "UAV";
+    default:
+      return "Unknown";
+  }
 }
 
 export function boundsToBBox(map) {
