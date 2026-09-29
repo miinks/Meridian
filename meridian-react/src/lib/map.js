@@ -1,7 +1,7 @@
 import { EMPTY } from "./format.js";
 
 function stamp(map, id, fill, glow, draw) {
-  const size = 64;
+  const size = 80;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -180,13 +180,27 @@ export function iconImageExpression(selectedId) {
   ];
 }
 
-const ZOOM_OUT = 3;
-const ZOOM_IN = 7;
-const OUT_SCALE = 1.3;
+const ZOOM_WORLD = 1.5;
+const ZOOM_OUT = 4;
+const ZOOM_IN = 8;
+const WORLD_SCALE = 2.15;
+const OUT_SCALE = 1.65;
+const BASE_SIZE = 1.08;
+const SELECTED_SIZE = 1.42;
 
 export function iconSizeExpression(selectedId) {
-  const sizeAt = (factor) => selectedExpression(selectedId, 0.95 * factor, 0.62 * factor);
-  return ["interpolate", ["linear"], ["zoom"], ZOOM_OUT, sizeAt(OUT_SCALE), ZOOM_IN, sizeAt(1)];
+  const sizeAt = (factor) => selectedExpression(selectedId, SELECTED_SIZE * factor, BASE_SIZE * factor);
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    ZOOM_WORLD,
+    sizeAt(WORLD_SCALE),
+    ZOOM_OUT,
+    sizeAt(OUT_SCALE),
+    ZOOM_IN,
+    sizeAt(1),
+  ];
 }
 
 export function installMapLayers(map) {
