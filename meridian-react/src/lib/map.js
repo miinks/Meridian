@@ -27,105 +27,94 @@ function fillPath(ctx, build) {
   ctx.fill();
 }
 
-function drawJet(ctx) {
+// Top-down planform: constant-width fuselage, swept main wings, separate tailplane.
+function drawAirliner(ctx, { half = 2.2, nose = -20, tail = 18, wingY = -1, span = 18, sweep = 8, chord = 5, stabSpan = 7, stabY = 13 }) {
   fillPath(ctx, (p) => {
-    p.moveTo(0, -16);
-    p.lineTo(4, -5);
-    p.lineTo(14, 1);
-    p.lineTo(4, -1);
-    p.lineTo(2, 10);
-    p.lineTo(6, 13);
-    p.lineTo(0, 11);
-    p.lineTo(-6, 13);
-    p.lineTo(-2, 10);
-    p.lineTo(-4, -1);
-    p.lineTo(-14, 1);
-    p.lineTo(-4, -5);
+    p.moveTo(0, nose);
+    p.quadraticCurveTo(half, nose + 4, half, nose + 8);
+    p.lineTo(half, wingY);
+    p.lineTo(span, wingY + sweep);
+    p.lineTo(span - 1.2, wingY + sweep + chord);
+    p.lineTo(half, wingY + chord - 1);
+    p.lineTo(half, stabY);
+    p.lineTo(stabSpan, stabY + 2.5);
+    p.lineTo(stabSpan - 0.8, stabY + 4.5);
+    p.lineTo(half * 0.7, stabY + 3);
+    p.lineTo(0, tail);
+    p.lineTo(-half * 0.7, stabY + 3);
+    p.lineTo(-(stabSpan - 0.8), stabY + 4.5);
+    p.lineTo(-stabSpan, stabY + 2.5);
+    p.lineTo(-half, stabY);
+    p.lineTo(-half, wingY + chord - 1);
+    p.lineTo(-(span - 1.2), wingY + sweep + chord);
+    p.lineTo(-span, wingY + sweep);
+    p.lineTo(-half, wingY);
+    p.lineTo(-half, nose + 8);
+    p.quadraticCurveTo(-half, nose + 4, 0, nose);
   });
+}
+
+function drawJet(ctx) {
+  drawAirliner(ctx, {});
 }
 
 function drawHeavy(ctx) {
-  fillPath(ctx, (p) => {
-    p.moveTo(0, -17);
-    p.lineTo(5, -6);
-    p.lineTo(17, 2);
-    p.lineTo(5, 0);
-    p.lineTo(3, 9);
-    p.lineTo(8, 13);
-    p.lineTo(0, 11);
-    p.lineTo(-8, 13);
-    p.lineTo(-3, 9);
-    p.lineTo(-5, 0);
-    p.lineTo(-17, 2);
-    p.lineTo(-5, -6);
-  });
+  drawAirliner(ctx, { half: 2.7, nose: -21, tail: 19, span: 22, sweep: 9, chord: 6, stabSpan: 8.5, stabY: 13.5 });
 }
 
 function drawSmall(ctx) {
-  fillPath(ctx, (p) => {
-    p.moveTo(0, -13);
-    p.lineTo(3, -4);
-    p.lineTo(11, 1);
-    p.lineTo(3, 0);
-    p.lineTo(2, 8);
-    p.lineTo(5, 11);
-    p.lineTo(0, 9);
-    p.lineTo(-5, 11);
-    p.lineTo(-2, 8);
-    p.lineTo(-3, 0);
-    p.lineTo(-11, 1);
-    p.lineTo(-3, -4);
-  });
+  drawAirliner(ctx, { half: 1.8, nose: -17, tail: 15, wingY: 0, span: 15, sweep: 3, chord: 4.2, stabSpan: 5.5, stabY: 11 });
 }
 
 function drawRotor(ctx) {
   ctx.save();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.ellipse(0, -6, 16, 3.5, 0, 0, Math.PI * 2);
+  ctx.arc(0, -4, 16, 0, Math.PI * 2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(-16, -6);
-  ctx.lineTo(16, -6);
+  ctx.moveTo(-16, -4);
+  ctx.lineTo(16, -4);
+  ctx.moveTo(0, -20);
+  ctx.lineTo(0, 12);
   ctx.stroke();
   fillPath(ctx, (p) => {
-    p.moveTo(-5, -2);
-    p.lineTo(5, -2);
-    p.lineTo(4, 8);
-    p.lineTo(0, 12);
-    p.lineTo(-4, 8);
+    p.moveTo(-3.2, -12);
+    p.lineTo(3.2, -12);
+    p.lineTo(3.5, 6);
+    p.lineTo(1.2, 14);
+    p.lineTo(-1.2, 14);
+    p.lineTo(-3.5, 6);
   });
   ctx.beginPath();
-  ctx.moveTo(0, 10);
-  ctx.lineTo(12, 14);
-  ctx.lineTo(12, 11);
+  ctx.moveTo(0, 14);
+  ctx.lineTo(10, 18);
+  ctx.moveTo(8, 16);
+  ctx.lineTo(12, 17);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawGlider(ctx) {
-  fillPath(ctx, (p) => {
-    p.moveTo(0, -12);
-    p.lineTo(2, -3);
-    p.lineTo(20, 2);
-    p.lineTo(2, 1);
-    p.lineTo(1, 10);
-    p.lineTo(5, 12);
-    p.lineTo(0, 10);
-    p.lineTo(-5, 12);
-    p.lineTo(-1, 10);
-    p.lineTo(-2, 1);
-    p.lineTo(-20, 2);
-    p.lineTo(-2, -3);
-  });
+  drawAirliner(ctx, { half: 1.4, nose: -16, tail: 15, wingY: 0, span: 24, sweep: 1.5, chord: 3.2, stabSpan: 5, stabY: 11 });
 }
 
 function drawUav(ctx) {
   fillPath(ctx, (p) => {
-    p.moveTo(0, -12);
-    p.lineTo(14, 8);
-    p.lineTo(0, 4);
-    p.lineTo(-14, 8);
+    p.moveTo(0, -16);
+    p.lineTo(4, -2);
+    p.lineTo(16, 6);
+    p.lineTo(14, 9);
+    p.lineTo(3, 4);
+    p.lineTo(2, 12);
+    p.lineTo(6, 15);
+    p.lineTo(0, 13);
+    p.lineTo(-6, 15);
+    p.lineTo(-2, 12);
+    p.lineTo(-3, 4);
+    p.lineTo(-14, 9);
+    p.lineTo(-16, 6);
+    p.lineTo(-4, -2);
   });
 }
 
