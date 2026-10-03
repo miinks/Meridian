@@ -1,7 +1,7 @@
 import { EMPTY } from "./format.js";
 
 function stamp(map, id, fill, glow, draw) {
-  const size = 80;
+  const size = 96;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -27,31 +27,71 @@ function fillPath(ctx, build) {
   ctx.fill();
 }
 
-// Top-down planform: constant-width fuselage, swept main wings, separate tailplane.
-function drawAirliner(ctx, { half = 2.2, nose = -20, tail = 18, wingY = -1, span = 18, sweep = 8, chord = 5, stabSpan = 7, stabY = 13 }) {
+function capsule(ctx, half, y0, y1) {
+  const radius = half;
+  ctx.beginPath();
+  ctx.moveTo(-half, y0 + radius);
+  ctx.arcTo(-half, y0, 0, y0, radius);
+  ctx.arcTo(half, y0, half, y0 + radius, radius);
+  ctx.lineTo(half, y1 - radius);
+  ctx.arcTo(half, y1, 0, y1, radius);
+  ctx.arcTo(-half, y1, -half, y1 - radius, radius);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function sweptWing(ctx, side, rootX, y, span, sweep, chord) {
+  const s = side;
   fillPath(ctx, (p) => {
-    p.moveTo(0, nose);
-    p.quadraticCurveTo(half, nose + 4, half, nose + 8);
-    p.lineTo(half, wingY);
-    p.lineTo(span, wingY + sweep);
-    p.lineTo(span - 1.2, wingY + sweep + chord);
-    p.lineTo(half, wingY + chord - 1);
-    p.lineTo(half, stabY);
-    p.lineTo(stabSpan, stabY + 2.5);
-    p.lineTo(stabSpan - 0.8, stabY + 4.5);
-    p.lineTo(half * 0.7, stabY + 3);
-    p.lineTo(0, tail);
-    p.lineTo(-half * 0.7, stabY + 3);
-    p.lineTo(-(stabSpan - 0.8), stabY + 4.5);
-    p.lineTo(-stabSpan, stabY + 2.5);
-    p.lineTo(-half, stabY);
-    p.lineTo(-half, wingY + chord - 1);
-    p.lineTo(-(span - 1.2), wingY + sweep + chord);
-    p.lineTo(-span, wingY + sweep);
-    p.lineTo(-half, wingY);
-    p.lineTo(-half, nose + 8);
-    p.quadraticCurveTo(-half, nose + 4, 0, nose);
+    p.moveTo(s * rootX, y);
+    p.lineTo(s * span, y + sweep);
+    p.lineTo(s * span, y + sweep + chord * 0.45);
+    p.lineTo(s * (span - 1.8), y + sweep + chord);
+    p.lineTo(s * rootX, y + chord * 0.72);
   });
+}
+
+function stab(ctx, side, rootX, y, span) {
+  const s = side;
+  fillPath(ctx, (p) => {
+    p.moveTo(s * rootX, y);
+    p.lineTo(s * span, y + 2.2);
+    p.lineTo(s * (span - 0.6), y + 4.2);
+    p.lineTo(s * rootX, y + 3.2);
+  });
+}
+
+function engine(ctx, x, y) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, 1.7, 3.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawAirliner(ctx, spec) {
+  const {
+    half = 2.35,
+    nose = -21,
+    tail = 18,
+    wingY = -2,
+    span = 19,
+    sweep = 7.5,
+    chord = 6.2,
+    stabSpan = 7.2,
+    stabY = 12.5,
+    engines = true,
+    engineX = 8.5,
+    engineY = 3.2,
+  } = spec;
+
+  sweptWing(ctx, 1, half - 0.2, wingY, span, sweep, chord);
+  sweptWing(ctx, -1, half - 0.2, wingY, span, sweep, chord);
+  if (engines) {
+    engine(ctx, engineX, engineY);
+    engine(ctx, -engineX, engineY);
+  }
+  stab(ctx, 1, half * 0.55, stabY, stabSpan);
+  stab(ctx, -1, half * 0.55, stabY, stabSpan);
+  capsule(ctx, half, nose, tail);
 }
 
 function drawJet(ctx) {
@@ -59,62 +99,96 @@ function drawJet(ctx) {
 }
 
 function drawHeavy(ctx) {
-  drawAirliner(ctx, { half: 2.7, nose: -21, tail: 19, span: 22, sweep: 9, chord: 6, stabSpan: 8.5, stabY: 13.5 });
+  drawAirliner(ctx, {
+    half: 2.85,
+    nose: -22,
+    tail: 19,
+    span: 23,
+    sweep: 8.5,
+    chord: 7.2,
+    stabSpan: 8.4,
+    stabY: 13,
+    engineX: 10.2,
+    engineY: 3.8,
+  });
+  engine(ctx, 6.2, 2.4);
+  engine(ctx, -6.2, 2.4);
 }
 
 function drawSmall(ctx) {
-  drawAirliner(ctx, { half: 1.8, nose: -17, tail: 15, wingY: 0, span: 15, sweep: 3, chord: 4.2, stabSpan: 5.5, stabY: 11 });
+  drawAirliner(ctx, {
+    half: 1.9,
+    nose: -17,
+    tail: 15,
+    wingY: -1,
+    span: 16,
+    sweep: 2.2,
+    chord: 5,
+    stabSpan: 5.8,
+    stabY: 10.5,
+    engines: false,
+  });
+  ctx.beginPath();
+  ctx.arc(0, -16.2, 1.6, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawRotor(ctx) {
   ctx.save();
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(0, -4, 16, 0, Math.PI * 2);
+  ctx.arc(0, -3, 17, 0, Math.PI * 2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(-16, -4);
-  ctx.lineTo(16, -4);
+  ctx.moveTo(-17, -3);
+  ctx.lineTo(17, -3);
   ctx.moveTo(0, -20);
-  ctx.lineTo(0, 12);
+  ctx.lineTo(0, 11);
   ctx.stroke();
-  fillPath(ctx, (p) => {
-    p.moveTo(-3.2, -12);
-    p.lineTo(3.2, -12);
-    p.lineTo(3.5, 6);
-    p.lineTo(1.2, 14);
-    p.lineTo(-1.2, 14);
-    p.lineTo(-3.5, 6);
-  });
+  capsule(ctx, 3.1, -13, 8);
   ctx.beginPath();
-  ctx.moveTo(0, 14);
-  ctx.lineTo(10, 18);
-  ctx.moveTo(8, 16);
-  ctx.lineTo(12, 17);
+  ctx.moveTo(0, 8);
+  ctx.lineTo(0, 16);
+  ctx.lineTo(9, 18);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(7, 16.2);
+  ctx.lineTo(11, 19.2);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawGlider(ctx) {
-  drawAirliner(ctx, { half: 1.4, nose: -16, tail: 15, wingY: 0, span: 24, sweep: 1.5, chord: 3.2, stabSpan: 5, stabY: 11 });
+  drawAirliner(ctx, {
+    half: 1.45,
+    nose: -16,
+    tail: 15,
+    wingY: -1,
+    span: 25,
+    sweep: 1.2,
+    chord: 3.4,
+    stabSpan: 5.2,
+    stabY: 11,
+    engines: false,
+  });
 }
 
 function drawUav(ctx) {
   fillPath(ctx, (p) => {
-    p.moveTo(0, -16);
-    p.lineTo(4, -2);
-    p.lineTo(16, 6);
-    p.lineTo(14, 9);
-    p.lineTo(3, 4);
-    p.lineTo(2, 12);
+    p.moveTo(0, -17);
+    p.lineTo(3.5, -4);
+    p.lineTo(17, 5);
+    p.lineTo(15, 8);
+    p.lineTo(3, 3);
+    p.lineTo(2.2, 11);
     p.lineTo(6, 15);
-    p.lineTo(0, 13);
+    p.lineTo(0, 12.5);
     p.lineTo(-6, 15);
-    p.lineTo(-2, 12);
-    p.lineTo(-3, 4);
-    p.lineTo(-14, 9);
-    p.lineTo(-16, 6);
-    p.lineTo(-4, -2);
+    p.lineTo(-2.2, 11);
+    p.lineTo(-3, 3);
+    p.lineTo(-15, 8);
+    p.lineTo(-17, 5);
+    p.lineTo(-3.5, -4);
   });
 }
 
