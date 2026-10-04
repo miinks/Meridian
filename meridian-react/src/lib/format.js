@@ -48,6 +48,7 @@ export function parseFlight(row) {
   if (lon == null || lat == null) return null;
   const callsign = (rawCallsign || "").trim() || id.toUpperCase();
   const airline = lookupAirline(callsign);
+  const cat = Number(category);
   return {
     id,
     callsign,
@@ -60,7 +61,7 @@ export function parseFlight(row) {
     heading: heading ?? 0,
     verticalRateMs: verticalRate,
     squawk,
-    category,
+    category: Number.isFinite(cat) ? cat : 0,
     airlineName: airline?.name || "",
     airlineFlight: airline?.flight || "",
     icon: aircraftIcon(category),
@@ -88,8 +89,46 @@ export function aroundFlight(flight, deg = 1.1) {
   };
 }
 
-export function matchesQuery(flight, needle) {
+export async function loadAirlines() {
+  const response = await fetch("/airlines.json");
+  if (!response.ok) throw new Error(`Airlines failed (${response.status})`);
+  return response.json();
+}
+
+export function airlineFromCallsign(callsign, airlines = {}) {
+  const text = String(callsign || "")
+    .trim()
+    .toUpperCase();
+  const icao = text.match(/^([A-Z]{3})/);
+  if (icao && airlines[icao[1]]) return airlines[icao[1]];
+  const iata = text.match(/^([A-Z0-9]{2})(?=\d)/);
+  if (iata && airlines[iata[1]]) return airlines[iata[1]];
+  return "";
+}
+
+export function matchesQuery(flight, needle, airlines = {}) {
   if (flight.callsign.toLowerCase().includes(needle) || flight.id.toLowerCase().includes(needle)) return true;
-  const airline = (flight.airlineName || "").toLowerCase();
-  return airline.includes(needle);
+  if ((flight.airlineName || "").toLowerCase().includes(needle)) return true;
+  if ((flight.airlineFlight || "").toLowerCase().includes(needle)) return true;
+  const airline = airlineFromCallsign(flight.callsign, airlines).toLowerCase();
+  return Boolean(airline) && airline.includes(needle);
+}
+
+export function matchesAirport(airport, needle) {
+  return (
+    airport.ident.toLowerCase().includes(needle) ||
+    airport.iata.toLowerCase().includes(needle) ||
+    airport.name.toLowerCase().includes(needle)
+  );
+}
+
+export function rankAirport(airport, needle) {
+  const ident = airport.ident.toLowerCase();
+  const iata = airport.iata.toLowerCase();
+  const name = airport.name.toLowerCase();
+  const typeBoost = airport.type === "L" ? 0 : airport.type === "M" ? 1 : 2;
+  if (iata === needle || ident === needle) return typeBoost;
+  if (iata.startsWith(needle) || ident.startsWith(needle)) return 10 + typeBoost;
+  if (name.startsWith(needle)) return 20 + typeBoost;
+  return 30 + typeBoost;
 }

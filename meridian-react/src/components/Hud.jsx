@@ -6,6 +6,7 @@ export default function Hud({
   onSearchSubmit,
   results,
   onPickResult,
+  onPickAirport,
   onWorldwide,
   paused,
   airborneOnly,
@@ -21,10 +22,10 @@ export default function Hud({
       </div>
 
       <label className="search">
-        <span className="search-label">Find a flight</span>
+        <span className="search-label">Find a flight or airport</span>
         <input
           id="search"
-          placeholder="Callsign or ICAO"
+          placeholder="Callsign, ICAO, or airport"
           autoComplete="off"
           spellCheck="false"
           value={searchValue}
@@ -35,7 +36,12 @@ export default function Hud({
             onSearchSubmit();
           }}
         />
-        <Results results={results} onPick={onPickResult} onWorldwide={onWorldwide} />
+        <Results
+          results={results}
+          onPick={onPickResult}
+          onPickAirport={onPickAirport}
+          onWorldwide={onWorldwide}
+        />
       </label>
 
       <div className="end">

@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .js,.jsx"
+    "lint": "eslint . --ext .js,.jsx",
+    "airports": "python3 scripts/build-airports.py",
+    "airlines": "python3 scripts/build-airlines.py"
   },
   "dependencies": {
     "maplibre-gl": "5.9.0",

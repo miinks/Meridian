@@ -1,5 +1,76 @@
 import { EMPTY } from "./format.js";
 
+export const AIRPORT_LAYERS = ["airports-large", "airports-medium", "airports-small"];
+
+export function airportsToGeoJSON(rows) {
+  return {
+    type: "FeatureCollection",
+    features: rows.map(([type, ident, iata, name, lon, lat]) => ({
+      type: "Feature",
+      properties: { type, ident, iata, name },
+      geometry: { type: "Point", coordinates: [lon, lat] },
+    })),
+  };
+}
+
+export async function loadAirports() {
+  const response = await fetch("/airports.json");
+  if (!response.ok) throw new Error(`Airports failed (${response.status})`);
+  return airportsToGeoJSON(await response.json());
+}
+
+export function airportIndex(collection) {
+  return (collection?.features || []).map((feature) => ({
+    ident: feature.properties.ident || "",
+    iata: feature.properties.iata || "",
+    name: feature.properties.name || "",
+    type: feature.properties.type || "S",
+    longitude: feature.geometry.coordinates[0],
+    latitude: feature.geometry.coordinates[1],
+  }));
+}
+
+function airportCircle(id, types, minzoom, radius, fill, stroke) {
+  return {
+    id,
+    type: "circle",
+    source: "airports",
+    minzoom,
+    filter: ["in", ["get", "type"], ["literal", types]],
+    paint: {
+      "circle-radius": radius,
+      "circle-color": fill,
+      "circle-stroke-color": stroke,
+      "circle-stroke-width": 1,
+      "circle-opacity": 0.95,
+    },
+  };
+}
+
+function airportLabels(id, types, minzoom, size) {
+  return {
+    id,
+    type: "symbol",
+    source: "airports",
+    minzoom,
+    filter: ["in", ["get", "type"], ["literal", types]],
+    layout: {
+      "text-field": ["coalesce", ["get", "iata"], ["get", "ident"]],
+      "text-size": size,
+      "text-offset": [0, 0.9],
+      "text-anchor": "top",
+      "text-optional": true,
+      "text-allow-overlap": false,
+      "text-padding": 2,
+    },
+    paint: {
+      "text-color": "#c8c3b8",
+      "text-halo-color": "#07080a",
+      "text-halo-width": 1.2,
+    },
+  };
+}
+
 function stamp(map, id, fill, glow, draw) {
   const size = 96;
   const canvas = document.createElement("canvas");
@@ -266,11 +337,19 @@ export function iconSizeExpression(selectedId) {
   ];
 }
 
-export function installMapLayers(map) {
+export function installMapLayers(map, airports = EMPTY) {
   for (const [name, draw] of Object.entries(ICONS)) {
     stamp(map, name, "#d7dde6", false, draw);
     stamp(map, `${name}-selected`, "#e8c17a", true, draw);
   }
+
+  map.addSource("airports", { type: "geojson", data: airports });
+  map.addLayer(airportCircle("airports-large", ["L"], 1, 4.2, "rgba(232, 193, 122, 0.18)", "rgba(232, 193, 122, 0.85)"));
+  map.addLayer(airportCircle("airports-medium", ["M"], 4.2, 3.1, "rgba(244, 241, 234, 0.08)", "rgba(244, 241, 234, 0.42)"));
+  map.addLayer(airportCircle("airports-small", ["S", "P"], 7.4, 2.2, "rgba(244, 241, 234, 0.05)", "rgba(244, 241, 234, 0.28)"));
+  map.addLayer(airportLabels("airport-labels-large", ["L"], 5.2, 11));
+  map.addLayer(airportLabels("airport-labels-medium", ["M"], 7.6, 10));
+  map.addLayer(airportLabels("airport-labels-small", ["S", "P"], 10.4, 9));
 
   map.addSource("trails", { type: "geojson", data: EMPTY });
   map.addSource("flights", { type: "geojson", data: EMPTY });
