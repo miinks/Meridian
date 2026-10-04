@@ -1,9 +1,9 @@
 {
-  "name": "meridian-react",
+  "name": "meridian",
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "Meridian — a quieter live flight map, rebuilt in React + Vite.",
+  "description": "Meridian — a quieter live flight map.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

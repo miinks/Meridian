@@ -1,6 +1,7 @@
 node_modules
 dist
 .DS_Store
+*.local
 credentials.json
 .env
 __pycache__/

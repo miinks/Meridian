@@ -1,6 +1,6 @@
 {
-  "name": "Meridian (React)",
-  "install": "cd meridian-react && npm install",
+  "name": "Meridian",
+  "install": "npm install",
   "terminals": [
     {
       "name": "opensky-proxy",
@@ -9,7 +9,7 @@
     },
     {
       "name": "meridian-web",
-      "command": "cd meridian-react && npm run dev",
+      "command": "npm run dev",
       "description": "Meridian React dev server (Vite) on http://127.0.0.1:5173. Proxies /api/* to the OpenSky proxy on :8000."
     }
   ],
