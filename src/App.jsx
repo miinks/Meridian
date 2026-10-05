@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
+import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
 import { AIRPORT_LAYERS, airportIndex, installMapLayers, loadAirports } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
@@ -25,31 +26,54 @@ export default function App() {
   const [tip, setTip] = useState({ visible: false, text: "", x: 0, y: 0 });
 
   useEffect(() => {
+    const initial = openingCamera();
+    const locatePromise = locateUser();
+    let cancelled = false;
+    let userMoved = false;
+
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: "https://tiles.openfreemap.org/styles/dark",
-      center: [-73.95, 40.74],
-      zoom: 7.2,
+      center: initial.center,
+      zoom: initial.zoom,
       attributionControl: { compact: true },
     });
+
+    const markUserMoved = (event) => {
+      if (!event?.originalEvent && event?.type !== "dragstart") return;
+      userMoved = true;
+    };
 
     const handleVisibility = () => {
       if (!document.hidden) controllerRef.current?.refresh();
     };
 
+    map.on("dragstart", markUserMoved);
+    map.on("zoomstart", markUserMoved);
+
     map.on("load", async () => {
-      let airports;
-      let airlines;
-      try {
-        airports = await loadAirports();
-      } catch {
-        airports = undefined;
+      const bootIcao = new URLSearchParams(location.search).get("icao");
+      const dataPromise = Promise.all([
+        loadAirports().catch(() => undefined),
+        loadAirlines().catch(() => undefined),
+      ]);
+
+      if (!bootIcao && !userMoved) {
+        setStatus({
+          kind: "loading",
+          label: "Finding your location",
+          meta: "OpenSky live positions",
+        });
+        const located = await locatePromise;
+        if (cancelled) return;
+        if (located && !userMoved) {
+          map.jumpTo(located);
+          saveCamera(map);
+        }
       }
-      try {
-        airlines = await loadAirlines();
-      } catch {
-        airlines = undefined;
-      }
+
+      const [airports, airlines] = await dataPromise;
+      if (cancelled) return;
       installMapLayers(map, airports);
 
       const controller = new MeridianController(map, {
@@ -64,7 +88,10 @@ export default function App() {
       if (airlines) controller.setAirlines(airlines);
       controllerRef.current = controller;
 
-      map.on("moveend", () => controller.handleMoveEnd());
+      map.on("moveend", () => {
+        saveCamera(map);
+        controller.handleMoveEnd();
+      });
       map.on("dragstart", () => controller.handleDragStart());
       map.on("click", "flights", (event) => controller.handleFlightClick(event));
       map.on("click", (event) => controller.handleMapClick(event));
@@ -92,6 +119,7 @@ export default function App() {
     });
 
     return () => {
+      cancelled = true;
       document.removeEventListener("visibilitychange", handleVisibility);
       controllerRef.current?.destroy();
       controllerRef.current = null;
