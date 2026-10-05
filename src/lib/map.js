@@ -125,169 +125,38 @@ function fillPath(ctx, build) {
   ctx.fill();
 }
 
-function capsule(ctx, half, y0, y1) {
-  const radius = half;
-  ctx.beginPath();
-  ctx.moveTo(-half, y0 + radius);
-  ctx.arcTo(-half, y0, 0, y0, radius);
-  ctx.arcTo(half, y0, half, y0 + radius, radius);
-  ctx.lineTo(half, y1 - radius);
-  ctx.arcTo(half, y1, 0, y1, radius);
-  ctx.arcTo(-half, y1, -half, y1 - radius, radius);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function sweptWing(ctx, side, rootX, y, span, sweep, chord) {
-  const s = side;
+function drawTriangle(ctx, size, width = size * 0.72) {
+  const nose = -size * 0.72;
+  const tail = size * 0.42;
   fillPath(ctx, (p) => {
-    p.moveTo(s * rootX, y);
-    p.lineTo(s * span, y + sweep);
-    p.lineTo(s * span, y + sweep + chord * 0.45);
-    p.lineTo(s * (span - 1.8), y + sweep + chord);
-    p.lineTo(s * rootX, y + chord * 0.72);
+    p.moveTo(0, nose);
+    p.lineTo(width, tail);
+    p.lineTo(-width, tail);
   });
-}
-
-function stab(ctx, side, rootX, y, span) {
-  const s = side;
-  fillPath(ctx, (p) => {
-    p.moveTo(s * rootX, y);
-    p.lineTo(s * span, y + 2.2);
-    p.lineTo(s * (span - 0.6), y + 4.2);
-    p.lineTo(s * rootX, y + 3.2);
-  });
-}
-
-function engine(ctx, x, y) {
-  ctx.beginPath();
-  ctx.ellipse(x, y, 1.7, 3.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawAirliner(ctx, spec) {
-  const {
-    half = 2.35,
-    nose = -21,
-    tail = 18,
-    wingY = -2,
-    span = 19,
-    sweep = 7.5,
-    chord = 6.2,
-    stabSpan = 7.2,
-    stabY = 12.5,
-    engines = true,
-    engineX = 8.5,
-    engineY = 3.2,
-  } = spec;
-
-  sweptWing(ctx, 1, half - 0.2, wingY, span, sweep, chord);
-  sweptWing(ctx, -1, half - 0.2, wingY, span, sweep, chord);
-  if (engines) {
-    engine(ctx, engineX, engineY);
-    engine(ctx, -engineX, engineY);
-  }
-  stab(ctx, 1, half * 0.55, stabY, stabSpan);
-  stab(ctx, -1, half * 0.55, stabY, stabSpan);
-  capsule(ctx, half, nose, tail);
 }
 
 function drawJet(ctx) {
-  drawAirliner(ctx, {});
+  drawTriangle(ctx, 19);
 }
 
 function drawHeavy(ctx) {
-  drawAirliner(ctx, {
-    half: 2.85,
-    nose: -22,
-    tail: 19,
-    span: 23,
-    sweep: 8.5,
-    chord: 7.2,
-    stabSpan: 8.4,
-    stabY: 13,
-    engineX: 10.2,
-    engineY: 3.8,
-  });
-  engine(ctx, 6.2, 2.4);
-  engine(ctx, -6.2, 2.4);
+  drawTriangle(ctx, 26);
 }
 
 function drawSmall(ctx) {
-  drawAirliner(ctx, {
-    half: 1.9,
-    nose: -17,
-    tail: 15,
-    wingY: -1,
-    span: 16,
-    sweep: 2.2,
-    chord: 5,
-    stabSpan: 5.8,
-    stabY: 10.5,
-    engines: false,
-  });
-  ctx.beginPath();
-  ctx.arc(0, -16.2, 1.6, 0, Math.PI * 2);
-  ctx.fill();
+  drawTriangle(ctx, 13);
 }
 
 function drawRotor(ctx) {
-  ctx.save();
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, -3, 17, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-17, -3);
-  ctx.lineTo(17, -3);
-  ctx.moveTo(0, -20);
-  ctx.lineTo(0, 11);
-  ctx.stroke();
-  capsule(ctx, 3.1, -13, 8);
-  ctx.beginPath();
-  ctx.moveTo(0, 8);
-  ctx.lineTo(0, 16);
-  ctx.lineTo(9, 18);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(7, 16.2);
-  ctx.lineTo(11, 19.2);
-  ctx.stroke();
-  ctx.restore();
+  drawTriangle(ctx, 15, 15 * 0.62);
 }
 
 function drawGlider(ctx) {
-  drawAirliner(ctx, {
-    half: 1.45,
-    nose: -16,
-    tail: 15,
-    wingY: -1,
-    span: 25,
-    sweep: 1.2,
-    chord: 3.4,
-    stabSpan: 5.2,
-    stabY: 11,
-    engines: false,
-  });
+  drawTriangle(ctx, 16, 16 * 1.05);
 }
 
 function drawUav(ctx) {
-  fillPath(ctx, (p) => {
-    p.moveTo(0, -17);
-    p.lineTo(3.5, -4);
-    p.lineTo(17, 5);
-    p.lineTo(15, 8);
-    p.lineTo(3, 3);
-    p.lineTo(2.2, 11);
-    p.lineTo(6, 15);
-    p.lineTo(0, 12.5);
-    p.lineTo(-6, 15);
-    p.lineTo(-2.2, 11);
-    p.lineTo(-3, 3);
-    p.lineTo(-15, 8);
-    p.lineTo(-17, 5);
-    p.lineTo(-3.5, -4);
-  });
+  drawTriangle(ctx, 11);
 }
 
 function drawBalloon(ctx) {
