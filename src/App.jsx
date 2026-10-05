@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
-import { AIRPORT_LAYERS, airportIndex, installMapLayers, loadAirports } from "./lib/map.js";
+import { AIRPORT_CLICK_LAYERS, airportIndex, installMapLayers, loadAirports } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
 import Sheet from "./components/Sheet.jsx";
@@ -93,7 +93,6 @@ export default function App() {
         controller.handleMoveEnd();
       });
       map.on("dragstart", () => controller.handleDragStart());
-      map.on("click", "flights", (event) => controller.handleFlightClick(event));
       map.on("click", (event) => controller.handleMapClick(event));
       map.on("mouseenter", "flights", () => {
         map.getCanvas().style.cursor = "pointer";
@@ -103,7 +102,7 @@ export default function App() {
         map.getCanvas().style.cursor = "";
         controller.hideTip();
       });
-      for (const layer of AIRPORT_LAYERS) {
+      for (const layer of AIRPORT_CLICK_LAYERS) {
         map.on("mouseenter", layer, () => {
           map.getCanvas().style.cursor = "pointer";
         });
@@ -158,6 +157,7 @@ export default function App() {
         sheet={sheet}
         onClose={() => controllerRef.current?.closeSheet()}
         onToggleFollow={() => controllerRef.current?.toggleFollow()}
+        onPickNearby={(id) => controllerRef.current?.pickResult(id)}
       />
       <Credit />
     </>

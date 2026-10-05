@@ -1,9 +1,16 @@
-export default function Sheet({ sheet, onClose, onToggleFollow }) {
+export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby }) {
   if (!sheet) return null;
+
+  const isAirport = sheet.kind === "airport";
 
   return (
     <aside className="sheet">
-      <button type="button" className="close" aria-label="Close flight details" onClick={onClose}>
+      <button
+        type="button"
+        className="close"
+        aria-label={isAirport ? "Close airport details" : "Close flight details"}
+        onClick={onClose}
+      >
         Close
       </button>
       <p className="eyebrow">{sheet.eyebrow}</p>
@@ -18,9 +25,26 @@ export default function Sheet({ sheet, onClose, onToggleFollow }) {
           </div>
         ))}
       </dl>
-      <button type="button" className="follow" aria-pressed={sheet.following} onClick={onToggleFollow}>
-        {sheet.following ? "Following" : "Follow"}
-      </button>
+      {isAirport ? (
+        <ul className="nearby">
+          {(sheet.nearby || []).length === 0 ? (
+            <li className="nearby-empty">No traffic in view yet</li>
+          ) : (
+            sheet.nearby.map((item) => (
+              <li key={item.id}>
+                <button type="button" onClick={() => onPickNearby(item.id)}>
+                  <strong>{item.callsign}</strong>
+                  <span>{item.detail}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : (
+        <button type="button" className="follow" aria-pressed={sheet.following} onClick={onToggleFollow}>
+          {sheet.following ? "Following" : "Follow"}
+        </button>
+      )}
     </aside>
   );
 }

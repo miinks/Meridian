@@ -8,6 +8,34 @@ export function lerp(from, to, t) {
   return from + (to - from) * t;
 }
 
+export function distanceKm(lat1, lon1, lat2, lon2) {
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+export function formatDistance(km) {
+  if (!Number.isFinite(km)) return "—";
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+
+export function airportKindLabel(type) {
+  switch (type) {
+    case "L":
+      return "Large airport";
+    case "M":
+      return "Medium airport";
+    case "P":
+      return "Seaplane base";
+    default:
+      return "Small airport";
+  }
+}
+
 export function formatAltitude(meters, onGround) {
   if (onGround) return "On ground";
   if (meters == null) return "—";

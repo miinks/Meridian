@@ -1,6 +1,33 @@
 import { EMPTY } from "./format.js";
 
 export const AIRPORT_LAYERS = ["airports-large", "airports-medium", "airports-small"];
+export const AIRPORT_LABEL_LAYERS = ["airport-labels-large", "airport-labels-medium", "airport-labels-small"];
+export const AIRPORT_CLICK_LAYERS = [...AIRPORT_LAYERS, ...AIRPORT_LABEL_LAYERS];
+
+const AIRPORT_CIRCLE = {
+  "airports-large": { radius: 4.2, selectedRadius: 6.2, stroke: "rgba(232, 193, 122, 0.85)" },
+  "airports-medium": { radius: 3.1, selectedRadius: 4.6, stroke: "rgba(244, 241, 234, 0.42)" },
+  "airports-small": { radius: 2.2, selectedRadius: 3.4, stroke: "rgba(244, 241, 234, 0.28)" },
+};
+
+export function highlightAirport(map, ident) {
+  const selected = ident || "";
+  for (const [id, spec] of Object.entries(AIRPORT_CIRCLE)) {
+    if (!map.getLayer(id)) continue;
+    map.setPaintProperty(id, "circle-stroke-color", [
+      "case",
+      ["==", ["get", "ident"], selected],
+      "rgba(232, 193, 122, 1)",
+      spec.stroke,
+    ]);
+    map.setPaintProperty(id, "circle-radius", [
+      "case",
+      ["==", ["get", "ident"], selected],
+      spec.selectedRadius,
+      spec.radius,
+    ]);
+  }
+}
 
 export function airportsToGeoJSON(rows) {
   return {

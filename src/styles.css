@@ -308,6 +308,42 @@ dt {
   border-radius: 14px;
 }
 
+.nearby {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.nearby button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nearby button:hover {
+  border-color: rgba(232, 193, 122, 0.45);
+}
+
+.nearby span,
+.nearby-empty {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.nearby-empty {
+  padding: 8px 2px 2px;
+}
+
 dt {
   font-size: 11px;
   text-transform: uppercase;
