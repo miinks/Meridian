@@ -358,8 +358,28 @@ dd {
 .credit {
   left: 20px;
   bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 8px 12px;
   border-radius: 999px;
+}
+
+.alt-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+
+.alt-key i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.alt-key span {
+  margin-left: 2px;
 }
 
 .credit a {

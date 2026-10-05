@@ -616,6 +616,7 @@ export class MeridianController {
           heading: flight.heading,
           onGround: flight.onGround,
           icon: flight.icon || "jet",
+          altitudeFt: flight.onGround || flight.altitudeM == null ? 0 : Math.round(flight.altitudeM * 3.28084),
         },
         geometry: {
           type: "Point",

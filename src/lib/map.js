@@ -126,12 +126,19 @@ function fillPath(ctx, build) {
 }
 
 function drawTriangle(ctx, size, width = size * 0.72) {
-  const nose = -size * 0.72;
+  const nose = -size * 0.68;
   const tail = size * 0.42;
+  const tick = size * 0.34;
+  const tickW = Math.max(1.7, size * 0.1);
   fillPath(ctx, (p) => {
     p.moveTo(0, nose);
     p.lineTo(width, tail);
     p.lineTo(-width, tail);
+  });
+  fillPath(ctx, (p) => {
+    p.moveTo(-tickW * 0.55, nose + 1.2);
+    p.lineTo(0, nose - tick);
+    p.lineTo(tickW * 0.55, nose + 1.2);
   });
 }
 
@@ -198,6 +205,16 @@ const ICONS = {
   ground: drawGround,
 };
 
+const ICON_COLORS = {
+  grounded: "#9aa0a8",
+  low: "#6ec8d6",
+  mid: "#7dcc7a",
+  high: "#d8c85c",
+  higher: "#e59a4a",
+  cruise: "#e07070",
+  selected: "#e8c17a",
+};
+
 export function selectedExpression(selectedId, selectedValue, fallback) {
   return ["case", ["==", ["get", "id"], selectedId || ""], selectedValue, fallback];
 }
@@ -206,7 +223,23 @@ export function iconImageExpression(selectedId) {
   return [
     "concat",
     ["coalesce", ["get", "icon"], "jet"],
-    ["case", ["==", ["get", "id"], selectedId || ""], "-selected", ""],
+    "-",
+    [
+      "case",
+      ["==", ["get", "id"], selectedId || ""],
+      "selected",
+      ["get", "onGround"],
+      "grounded",
+      ["<", ["coalesce", ["get", "altitudeFt"], 0], 8000],
+      "low",
+      ["<", ["get", "altitudeFt"], 18000],
+      "mid",
+      ["<", ["get", "altitudeFt"], 28000],
+      "high",
+      ["<", ["get", "altitudeFt"], 38000],
+      "higher",
+      "cruise",
+    ],
   ];
 }
 
@@ -235,8 +268,9 @@ export function iconSizeExpression(selectedId) {
 
 export function installMapLayers(map, airports = EMPTY) {
   for (const [name, draw] of Object.entries(ICONS)) {
-    stamp(map, name, "#d7dde6", false, draw);
-    stamp(map, `${name}-selected`, "#e8c17a", true, draw);
+    for (const [band, color] of Object.entries(ICON_COLORS)) {
+      stamp(map, `${name}-${band}`, color, band === "selected", draw);
+    }
   }
 
   map.addSource("airports", { type: "geojson", data: airports });
