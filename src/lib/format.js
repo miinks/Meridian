@@ -23,6 +23,47 @@ export function formatDistance(km) {
   return `${Math.round(km)} km`;
 }
 
+export function greatCircle(lon1, lat1, lon2, lat2, steps = 48) {
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const toDeg = (radians) => (radians * 180) / Math.PI;
+  const φ1 = toRad(lat1);
+  const λ1 = toRad(lon1);
+  const φ2 = toRad(lat2);
+  const λ2 = toRad(lon2);
+  const Δ = 2 * Math.asin(
+    Math.min(
+      1,
+      Math.sqrt(Math.sin((φ2 - φ1) / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin((λ2 - λ1) / 2) ** 2),
+    ),
+  );
+  if (!Number.isFinite(Δ) || Δ < 1e-6) return [[lon1, lat1], [lon2, lat2]];
+
+  const coords = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const fraction = i / steps;
+    const a = Math.sin((1 - fraction) * Δ) / Math.sin(Δ);
+    const b = Math.sin(fraction * Δ) / Math.sin(Δ);
+    const x = a * Math.cos(φ1) * Math.cos(λ1) + b * Math.cos(φ2) * Math.cos(λ2);
+    const y = a * Math.cos(φ1) * Math.sin(λ1) + b * Math.cos(φ2) * Math.sin(λ2);
+    const z = a * Math.sin(φ1) + b * Math.sin(φ2);
+    coords.push([toDeg(Math.atan2(y, x)), toDeg(Math.atan2(z, Math.hypot(x, y)))]);
+  }
+  return coords;
+}
+
+export function splitAntimeridian(coords) {
+  const parts = [[]];
+  for (const point of coords) {
+    const current = parts[parts.length - 1];
+    if (current.length && Math.abs(point[0] - current[current.length - 1][0]) > 180) {
+      parts.push([point]);
+    } else {
+      current.push(point);
+    }
+  }
+  return parts.filter((part) => part.length > 1);
+}
+
 export function airportKindLabel(type) {
   switch (type) {
     case "L":

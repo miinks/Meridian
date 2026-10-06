@@ -1,6 +1,7 @@
 import {
   POLL_MS,
   ICAO,
+  EMPTY,
   lerp,
   formatAltitude,
   formatSpeed,
@@ -17,6 +18,8 @@ import {
   distanceKm,
   formatDistance,
   airportKindLabel,
+  greatCircle,
+  splitAntimeridian,
 } from "./format.js";
 import { highlightAirport, iconImageExpression, iconSizeExpression, AIRPORT_CLICK_LAYERS } from "./map.js";
 import { formatAircraft, iconFromTypecode } from "./identity.js";
@@ -61,6 +64,7 @@ export class MeridianController {
     this.programmaticMove = false;
     this.searchValue = "";
     this.aircraftCache = new Map();
+    this.routeCache = new Map();
   }
 
   // ---- quota + pause -------------------------------------------------------
@@ -260,10 +264,15 @@ export class MeridianController {
         }
       : undefined;
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
+    const route = flight ? this.routeFor(flight) : null;
+    const destLabel = route?.destination
+      ? [route.destination.code, route.destination.name].filter(Boolean).join(" · ")
+      : null;
     const facts = flight
       ? [
           ["Flight", flight.airlineFlight || flight.callsign],
           ["Aircraft", formatAircraft(info, flight.category)],
+          ["Destination", destLabel || (route === undefined ? "Looking up…" : "—")],
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
@@ -312,6 +321,8 @@ export class MeridianController {
     else if (follow) this.following = true;
 
     const flight = id ? this.flights.get(id) : null;
+    if (id) this.lookupAircraft(id);
+    if (flight) this.lookupRoute(flight);
     this.renderSheet(flight);
     this.syncUrl();
 
@@ -319,8 +330,6 @@ export class MeridianController {
       this.map.setLayoutProperty("flights", "icon-image", iconImageExpression(id));
       this.map.setLayoutProperty("flights", "icon-size", iconSizeExpression(id));
     }
-
-    if (id) this.lookupAircraft(id);
 
     if (fly && flight) {
       this.programmaticMove = true;
@@ -354,6 +363,60 @@ export class MeridianController {
       this.aircraftCache.set(id, null);
     }
     if (id === this.selectedId) this.renderSheet(this.flights.get(id) || null);
+  }
+
+  routeKey(callsign) {
+    return String(callsign || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "");
+  }
+
+  routeFor(flight) {
+    const key = this.routeKey(flight?.callsign);
+    if (!key || this.routeCache.get(key) === "pending") return undefined;
+    return this.routeCache.get(key) || null;
+  }
+
+  airportByCode(code) {
+    const needle = String(code || "")
+      .trim()
+      .toUpperCase();
+    if (!needle) return null;
+    return this.airports.find((airport) => airport.ident === needle || airport.iata === needle) || null;
+  }
+
+  placeFromRouteAirport(place) {
+    if (!place || typeof place !== "object") return null;
+    const icao = (place.icao_code || place.icao || "").trim().toUpperCase();
+    const iata = (place.iata_code || place.iata || "").trim().toUpperCase();
+    const local = this.airportByCode(icao) || this.airportByCode(iata);
+    const longitude = Number(place.longitude ?? local?.longitude);
+    const latitude = Number(place.latitude ?? local?.latitude);
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
+    return {
+      code: iata || icao || local?.iata || local?.ident || "",
+      name: (place.name || local?.name || "").trim(),
+      longitude,
+      latitude,
+    };
+  }
+
+  async lookupRoute(flight) {
+    const key = this.routeKey(flight?.callsign);
+    if (!key || ICAO.test(key) || this.routeCache.has(key)) return;
+    this.routeCache.set(key, "pending");
+    try {
+      const response = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(key)}`);
+      const payload = await response.json();
+      const route = payload?.response?.flightroute;
+      const destination = this.placeFromRouteAirport(route?.destination);
+      const origin = this.placeFromRouteAirport(route?.origin);
+      this.routeCache.set(key, destination || origin ? { origin, destination } : null);
+    } catch {
+      this.routeCache.set(key, null);
+    }
+    if (this.selectedId === flight.id) this.renderSheet(this.flights.get(flight.id) || null);
   }
 
   // ---- results dropdown ----------------------------------------------------
@@ -546,6 +609,7 @@ export class MeridianController {
         );
       }
 
+      if (tracked) this.lookupRoute(tracked);
       this.renderSheet(tracked || null);
       this.renderResults(this.searchValue);
     } catch (error) {
@@ -641,6 +705,25 @@ export class MeridianController {
               },
             ]
           : [],
+    });
+
+    const routeSource = this.map.getSource("route");
+    if (!routeSource) return;
+    const selected = this.selectedId ? this.flights.get(this.selectedId) : null;
+    const dest = selected ? this.routeFor(selected)?.destination : null;
+    if (!selected || !dest) {
+      routeSource.setData(EMPTY);
+      return;
+    }
+    const selectedFeature = features.find((feature) => feature.properties.id === selected.id);
+    const from = selectedFeature?.geometry.coordinates || [selected.longitude, selected.latitude];
+    routeSource.setData({
+      type: "FeatureCollection",
+      features: splitAntimeridian(greatCircle(from[0], from[1], dest.longitude, dest.latitude)).map((coordinates) => ({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates },
+      })),
     });
   }
 

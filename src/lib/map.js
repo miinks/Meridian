@@ -290,6 +290,7 @@ export function installMapLayers(map, airports = EMPTY) {
   map.addLayer(airportLabels("airport-labels-small", ["S", "P"], 10.4, 9));
 
   map.addSource("trails", { type: "geojson", data: EMPTY });
+  map.addSource("route", { type: "geojson", data: EMPTY });
   map.addSource("flights", { type: "geojson", data: EMPTY });
 
   map.addLayer({
@@ -300,6 +301,18 @@ export function installMapLayers(map, airports = EMPTY) {
       "line-color": "#e8c17a",
       "line-width": 1.4,
       "line-opacity": 0.45,
+    },
+  });
+
+  map.addLayer({
+    id: "route",
+    type: "line",
+    source: "route",
+    paint: {
+      "line-color": "#e8c17a",
+      "line-width": 1.7,
+      "line-opacity": 0.72,
+      "line-dasharray": [2.2, 1.6],
     },
   });
 
