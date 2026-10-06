@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
-import { AIRPORT_CLICK_LAYERS, airportIndex, installMapLayers, loadAirports } from "./lib/map.js";
+import { AIRPORT_CLICK_LAYERS, airportIndex, installMapLayers, loadAirports, loadRunways, runwayIndex } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
 import Sheet from "./components/Sheet.jsx";
@@ -56,6 +56,7 @@ export default function App() {
       const dataPromise = Promise.all([
         loadAirports().catch(() => undefined),
         loadAirlines().catch(() => undefined),
+        loadRunways().catch(() => undefined),
       ]);
 
       if (!bootIcao && !userMoved) {
@@ -72,9 +73,9 @@ export default function App() {
         }
       }
 
-      const [airports, airlines] = await dataPromise;
+      const [airports, airlines, runways] = await dataPromise;
       if (cancelled) return;
-      installMapLayers(map, airports);
+      installMapLayers(map, airports, runways);
 
       const controller = new MeridianController(map, {
         onStatus: setStatus,
@@ -86,6 +87,7 @@ export default function App() {
       });
       if (airports) controller.setAirports(airportIndex(airports));
       if (airlines) controller.setAirlines(airlines);
+      if (runways) controller.setRunways(runwayIndex(runways));
       controllerRef.current = controller;
 
       map.on("moveend", () => {

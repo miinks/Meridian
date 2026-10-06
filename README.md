@@ -35,7 +35,7 @@ elsewhere.
 - `npm run build` — production build to `dist/`.
 - `npm run preview` — serve the production build (also proxies `/api`).
 - `npm run lint` — ESLint.
-- `npm run airports` — rebuild `public/airports.json` from OurAirports.
+- `npm run airports` — rebuild `public/airports.json` and `public/runways.json` from OurAirports.
 - `npm run airlines` — rebuild `public/airlines.json` from OpenFlights.
 
 ## Citation

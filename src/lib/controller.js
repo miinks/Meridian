@@ -60,6 +60,7 @@ export class MeridianController {
     this.inflight = false;
     this.airports = [];
     this.airlines = {};
+    this.runways = new Map();
     this.selectedAirport = null;
     this.programmaticMove = false;
     this.searchValue = "";
@@ -221,18 +222,21 @@ export class MeridianController {
     const airborne = nearby.filter((item) => item.where === "air");
     const listed = [...onGround.slice(0, 4), ...airborne.slice(0, 4)];
     const code = airport.iata || airport.ident;
+    const pairs = this.runways.get(airport.ident) || [];
+    const facts = [
+      ["ICAO", airport.ident],
+      ["IATA", airport.iata || "—"],
+      ["Type", airportKindLabel(airport.type)],
+      ["Nearby", `${airborne.length} airborne · ${onGround.length} on ground`],
+    ];
+    if (pairs.length) facts.splice(3, 0, ["Runways", pairs.join(" · ")]);
     this.cb.onSheet({
       kind: "airport",
       eyebrow: "Airport",
       callsign: code,
       airline: airport.name,
       icao: airport.ident,
-      facts: [
-        ["ICAO", airport.ident],
-        ["IATA", airport.iata || "—"],
-        ["Type", airportKindLabel(airport.type)],
-        ["Nearby", `${airborne.length} airborne · ${onGround.length} on ground`],
-      ],
+      facts,
       nearby: listed.map(({ flight, km, where }) => ({
         id: flight.id,
         callsign: flight.callsign,
@@ -429,6 +433,11 @@ export class MeridianController {
   setAirports(airports) {
     this.airports = airports || [];
     if (this.searchValue) this.renderResults(this.searchValue);
+  }
+
+  setRunways(runways) {
+    this.runways = runways || new Map();
+    if (this.selectedAirport) this.renderAirportSheet();
   }
 
   setAirlines(airlines) {
@@ -759,8 +768,10 @@ export class MeridianController {
   showAirportTip(event) {
     const props = event.features?.[0]?.properties;
     if (!props) return this.hideTip();
-    const code = props.iata || props.ident;
-    const text = code && props.name ? `${code} · ${props.name}` : props.name || code;
+    const airport = props.ident ? this.airports.find((item) => item.ident === props.ident) : null;
+    const code = props.iata || airport?.iata || props.ident;
+    const name = props.name || airport?.name;
+    const text = code && name ? `${code} · ${name}` : name || code;
     if (!text) return this.hideTip();
     this.cb.onTip({ visible: true, text, x: event.point.x, y: event.point.y });
   }
@@ -840,7 +851,13 @@ export class MeridianController {
     highlightAirport(this.map, airport.ident);
     this.selectFlight(null);
     this.programmaticMove = true;
-    const zoom = airport.type === "L" ? 10 : airport.type === "M" ? 11.2 : 12.4;
+    const zoom = this.runways.has(airport.ident)
+      ? 12.6
+      : airport.type === "L"
+        ? 10
+        : airport.type === "M"
+          ? 11.2
+          : 12.4;
     this.map.easeTo({
       center: [airport.longitude, airport.latitude],
       zoom: Math.max(this.map.getZoom(), zoom),
@@ -897,8 +914,14 @@ export class MeridianController {
     const distance = (feature) => {
       const coords = feature.geometry?.coordinates;
       if (!Array.isArray(coords) || coords.length < 2) return Number.POSITIVE_INFINITY;
-      const point = this.map.project(coords);
-      return Math.hypot(point.x - x, point.y - y);
+      const points = Array.isArray(coords[0]) ? coords : [coords];
+      let best = Number.POSITIVE_INFINITY;
+      for (const pair of points) {
+        if (!Array.isArray(pair) || pair.length < 2) continue;
+        const point = this.map.project(pair);
+        best = Math.min(best, Math.hypot(point.x - x, point.y - y));
+      }
+      return best;
     };
 
     const flight = flightHits[0];

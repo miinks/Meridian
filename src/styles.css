@@ -302,6 +302,10 @@ dt {
   margin: 0 0 18px;
 }
 
+.sheet dl .wide {
+  grid-column: 1 / -1;
+}
+
 .follow {
   width: 100%;
   padding: 11px 12px;

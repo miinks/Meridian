@@ -1,8 +1,9 @@
-import { EMPTY } from "./format.js";
+import { EMPTY, distanceKm } from "./format.js";
 
 export const AIRPORT_LAYERS = ["airports-large", "airports-medium", "airports-small"];
 export const AIRPORT_LABEL_LAYERS = ["airport-labels-large", "airport-labels-medium", "airport-labels-small"];
-export const AIRPORT_CLICK_LAYERS = [...AIRPORT_LAYERS, ...AIRPORT_LABEL_LAYERS];
+export const RUNWAY_LAYERS = ["runways", "runway-headings"];
+export const AIRPORT_CLICK_LAYERS = [...AIRPORT_LAYERS, ...AIRPORT_LABEL_LAYERS, ...RUNWAY_LAYERS];
 
 const AIRPORT_CIRCLE = {
   "airports-large": { radius: 4.2, selectedRadius: 6.2, stroke: "rgba(232, 193, 122, 0.85)" },
@@ -25,6 +26,22 @@ export function highlightAirport(map, ident) {
       ["==", ["get", "ident"], selected],
       spec.selectedRadius,
       spec.radius,
+    ]);
+  }
+  if (map.getLayer("runways")) {
+    map.setPaintProperty("runways", "line-opacity", [
+      "case",
+      ["==", ["get", "ident"], selected],
+      0.92,
+      0.58,
+    ]);
+  }
+  if (map.getLayer("runway-headings")) {
+    map.setPaintProperty("runway-headings", "text-opacity", [
+      "case",
+      ["==", ["get", "ident"], selected],
+      1,
+      0.82,
     ]);
   }
 }
@@ -57,6 +74,94 @@ export function airportIndex(collection) {
   }));
 }
 
+function toRad(degrees) {
+  return (degrees * Math.PI) / 180;
+}
+
+function toDeg(radians) {
+  return (radians * 180) / Math.PI;
+}
+
+function bearingDeg(lon1, lat1, lon2, lat2) {
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function destination(lon, lat, heading, meters) {
+  const φ1 = toRad(lat);
+  const λ1 = toRad(lon);
+  const bearing = toRad(heading);
+  const angular = meters / 6_371_000;
+  const φ2 = Math.asin(
+    Math.sin(φ1) * Math.cos(angular) + Math.cos(φ1) * Math.sin(angular) * Math.cos(bearing),
+  );
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angular) * Math.cos(φ1),
+      Math.cos(angular) - Math.sin(φ1) * Math.sin(φ2),
+    );
+  return [((toDeg(λ2) + 540) % 360) - 180, toDeg(φ2)];
+}
+
+export function runwaysToGeoJSON(rows) {
+  const lines = [];
+  const headings = [];
+  for (const [ident, le, he, leLon, leLat, heLon, heLat] of rows || []) {
+    if (![leLon, leLat, heLon, heLat].every(Number.isFinite)) continue;
+    lines.push({
+      type: "Feature",
+      properties: { ident, le, he },
+      geometry: { type: "LineString", coordinates: [[leLon, leLat], [heLon, heLat]] },
+    });
+    const leHeading = bearingDeg(leLon, leLat, heLon, heLat);
+    const heHeading = (leHeading + 180) % 360;
+    const meters = distanceKm(leLat, leLon, heLat, heLon) * 1000;
+    const outward = Math.min(220, Math.max(90, meters * 0.08));
+    if (le) {
+      headings.push({
+        type: "Feature",
+        properties: { ident, label: le, heading: leHeading },
+        geometry: { type: "Point", coordinates: destination(leLon, leLat, heHeading, outward) },
+      });
+    }
+    if (he) {
+      headings.push({
+        type: "Feature",
+        properties: { ident, label: he, heading: heHeading },
+        geometry: { type: "Point", coordinates: destination(heLon, heLat, leHeading, outward) },
+      });
+    }
+  }
+  return {
+    lines: { type: "FeatureCollection", features: lines },
+    headings: { type: "FeatureCollection", features: headings },
+  };
+}
+
+export async function loadRunways() {
+  const response = await fetch("/runways.json");
+  if (!response.ok) throw new Error(`Runways failed (${response.status})`);
+  return runwaysToGeoJSON(await response.json());
+}
+
+export function runwayIndex(collection) {
+  const byAirport = new Map();
+  for (const feature of collection?.lines?.features || []) {
+    const ident = feature.properties?.ident;
+    const pair = [feature.properties?.le, feature.properties?.he].filter(Boolean).join("/");
+    if (!ident || !pair) continue;
+    const list = byAirport.get(ident) || [];
+    list.push(pair);
+    byAirport.set(ident, list);
+  }
+  return byAirport;
+}
+
 function airportCircle(id, types, minzoom, radius, fill, stroke) {
   return {
     id,
@@ -83,6 +188,7 @@ function airportLabels(id, types, minzoom, size) {
     filter: ["in", ["get", "type"], ["literal", types]],
     layout: {
       "text-field": ["coalesce", ["get", "iata"], ["get", "ident"]],
+      "text-font": ["Noto Sans Regular"],
       "text-size": size,
       "text-offset": [0, 0.9],
       "text-anchor": "top",
@@ -275,7 +381,7 @@ export function iconSizeExpression(selectedId) {
   ];
 }
 
-export function installMapLayers(map, airports = EMPTY) {
+export function installMapLayers(map, airports = EMPTY, runways = { lines: EMPTY, headings: EMPTY }) {
   for (const [name, draw] of Object.entries(ICONS)) {
     stamp(map, name, "#f4f1ea", "#111111", false, draw);
     stamp(map, `${name}-selected`, "#e8c17a", "#111111", true, draw);
@@ -288,6 +394,51 @@ export function installMapLayers(map, airports = EMPTY) {
   map.addLayer(airportLabels("airport-labels-large", ["L"], 5.2, 11));
   map.addLayer(airportLabels("airport-labels-medium", ["M"], 7.6, 10));
   map.addLayer(airportLabels("airport-labels-small", ["S", "P"], 10.4, 9));
+
+  map.addSource("runways", { type: "geojson", data: runways.lines || EMPTY });
+  map.addSource("runway-headings", { type: "geojson", data: runways.headings || EMPTY });
+  map.addLayer({
+    id: "runways",
+    type: "line",
+    source: "runways",
+    minzoom: 9.6,
+    layout: {
+      "line-cap": "square",
+      "line-join": "miter",
+    },
+    paint: {
+      "line-color": "#e8c17a",
+      "line-opacity": 0.58,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 9.6, 1.2, 12, 2.4, 14, 5, 16, 11],
+    },
+  });
+  map.addLayer({
+    id: "runway-headings",
+    type: "symbol",
+    source: "runway-headings",
+    minzoom: 11.2,
+    layout: {
+      "text-field": ["to-string", ["get", "label"]],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 11.2, 12, 14, 16],
+      "text-rotate": ["get", "heading"],
+      "text-rotation-alignment": "map",
+      "text-pitch-alignment": "map",
+      "text-keep-upright": false,
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "text-anchor": "center",
+      "text-padding": 0,
+      "text-letter-spacing": 0.08,
+      "text-max-width": 8,
+    },
+    paint: {
+      "text-color": "#f4f1ea",
+      "text-halo-color": "#07080a",
+      "text-halo-width": 1.6,
+      "text-opacity": 0.92,
+    },
+  });
 
   map.addSource("trails", { type: "geojson", data: EMPTY });
   map.addSource("route", { type: "geojson", data: EMPTY });
