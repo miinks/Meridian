@@ -111,7 +111,7 @@ function stamp(map, id, fill, stroke, glow, draw) {
   }
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = 2.8;
+  ctx.lineWidth = 2.2;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   draw(ctx);
@@ -127,42 +127,76 @@ function fillPath(ctx, build) {
   ctx.stroke();
 }
 
-function drawTriangle(ctx, size, width = size * 0.72) {
-  const nose = -size * 0.68;
-  const tail = size * 0.42;
-  const tick = size * 0.34;
-  const tickW = Math.max(1.7, size * 0.1);
+function drawPlane(ctx, scale, span = 20) {
+  const s = scale;
+  const w = span;
   fillPath(ctx, (p) => {
-    p.moveTo(0, nose - tick);
-    p.lineTo(tickW * 0.55, nose + 1.2);
-    p.lineTo(width, tail);
-    p.lineTo(-width, tail);
-    p.lineTo(-tickW * 0.55, nose + 1.2);
+    p.moveTo(0, -22 * s);
+    p.lineTo(2.5 * s, -13 * s);
+    p.lineTo(2.7 * s, -4.5 * s);
+    p.lineTo(w * s, 2.2 * s);
+    p.lineTo(w * s, 6.8 * s);
+    p.lineTo(2.7 * s, 1.8 * s);
+    p.lineTo(2.5 * s, 11 * s);
+    p.lineTo(8.2 * s, 16.8 * s);
+    p.lineTo(8.2 * s, 20 * s);
+    p.lineTo(0, 16.2 * s);
+    p.lineTo(-8.2 * s, 20 * s);
+    p.lineTo(-8.2 * s, 16.8 * s);
+    p.lineTo(-2.5 * s, 11 * s);
+    p.lineTo(-2.7 * s, 1.8 * s);
+    p.lineTo(-w * s, 6.8 * s);
+    p.lineTo(-w * s, 2.2 * s);
+    p.lineTo(-2.7 * s, -4.5 * s);
+    p.lineTo(-2.5 * s, -13 * s);
   });
 }
 
 function drawJet(ctx) {
-  drawTriangle(ctx, 19);
+  drawPlane(ctx, 1, 20);
 }
 
 function drawHeavy(ctx) {
-  drawTriangle(ctx, 26);
+  drawPlane(ctx, 1.18, 23);
 }
 
 function drawSmall(ctx) {
-  drawTriangle(ctx, 13);
+  drawPlane(ctx, 0.74, 18);
 }
 
 function drawRotor(ctx) {
-  drawTriangle(ctx, 15, 15 * 0.62);
+  ctx.beginPath();
+  ctx.arc(0, -2, 16, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-16, -2);
+  ctx.lineTo(16, -2);
+  ctx.moveTo(0, -18);
+  ctx.lineTo(0, 10);
+  ctx.stroke();
+  fillPath(ctx, (p) => {
+    p.moveTo(-3.2, -12);
+    p.lineTo(3.2, -12);
+    p.lineTo(3.2, 7);
+    p.lineTo(-3.2, 7);
+  });
+  ctx.beginPath();
+  ctx.moveTo(0, 7);
+  ctx.lineTo(0, 16);
+  ctx.lineTo(8, 18);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(6.5, 16.2);
+  ctx.lineTo(10, 19.4);
+  ctx.stroke();
 }
 
 function drawGlider(ctx) {
-  drawTriangle(ctx, 16, 16 * 1.05);
+  drawPlane(ctx, 0.78, 28);
 }
 
 function drawUav(ctx) {
-  drawTriangle(ctx, 11);
+  drawPlane(ctx, 0.68, 22);
 }
 
 function drawBalloon(ctx) {
