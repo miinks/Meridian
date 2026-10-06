@@ -98,7 +98,7 @@ function airportLabels(id, types, minzoom, size) {
   };
 }
 
-function stamp(map, id, fill, glow, draw) {
+function stamp(map, id, fill, stroke, glow, draw) {
   const size = 96;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -110,7 +110,8 @@ function stamp(map, id, fill, glow, draw) {
     ctx.shadowBlur = 14;
   }
   ctx.fillStyle = fill;
-  ctx.strokeStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 2.8;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   draw(ctx);
@@ -123,6 +124,7 @@ function fillPath(ctx, build) {
   build(ctx);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
 }
 
 function drawTriangle(ctx, size, width = size * 0.72) {
@@ -131,14 +133,11 @@ function drawTriangle(ctx, size, width = size * 0.72) {
   const tick = size * 0.34;
   const tickW = Math.max(1.7, size * 0.1);
   fillPath(ctx, (p) => {
-    p.moveTo(0, nose);
+    p.moveTo(0, nose - tick);
+    p.lineTo(tickW * 0.55, nose + 1.2);
     p.lineTo(width, tail);
     p.lineTo(-width, tail);
-  });
-  fillPath(ctx, (p) => {
-    p.moveTo(-tickW * 0.55, nose + 1.2);
-    p.lineTo(0, nose - tick);
-    p.lineTo(tickW * 0.55, nose + 1.2);
+    p.lineTo(-tickW * 0.55, nose + 1.2);
   });
 }
 
@@ -170,8 +169,9 @@ function drawBalloon(ctx) {
   ctx.beginPath();
   ctx.ellipse(0, -6, 10, 11, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
   ctx.fillRect(-3, 6, 6, 5);
-  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-3, 6, 6, 5);
   ctx.beginPath();
   ctx.moveTo(-6, 2);
   ctx.lineTo(-3, 6);
@@ -192,6 +192,7 @@ function drawGround(ctx) {
   ctx.arc(-5, 6, 2.2, 0, Math.PI * 2);
   ctx.arc(7, 6, 2.2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 }
 
 const ICONS = {
@@ -205,16 +206,6 @@ const ICONS = {
   ground: drawGround,
 };
 
-const ICON_COLORS = {
-  grounded: "#9aa0a8",
-  low: "#6ec8d6",
-  mid: "#7dcc7a",
-  high: "#d8c85c",
-  higher: "#e59a4a",
-  cruise: "#e07070",
-  selected: "#e8c17a",
-};
-
 export function selectedExpression(selectedId, selectedValue, fallback) {
   return ["case", ["==", ["get", "id"], selectedId || ""], selectedValue, fallback];
 }
@@ -223,23 +214,7 @@ export function iconImageExpression(selectedId) {
   return [
     "concat",
     ["coalesce", ["get", "icon"], "jet"],
-    "-",
-    [
-      "case",
-      ["==", ["get", "id"], selectedId || ""],
-      "selected",
-      ["get", "onGround"],
-      "grounded",
-      ["<", ["coalesce", ["get", "altitudeFt"], 0], 8000],
-      "low",
-      ["<", ["get", "altitudeFt"], 18000],
-      "mid",
-      ["<", ["get", "altitudeFt"], 28000],
-      "high",
-      ["<", ["get", "altitudeFt"], 38000],
-      "higher",
-      "cruise",
-    ],
+    ["case", ["==", ["get", "id"], selectedId || ""], "-selected", ""],
   ];
 }
 
@@ -268,9 +243,8 @@ export function iconSizeExpression(selectedId) {
 
 export function installMapLayers(map, airports = EMPTY) {
   for (const [name, draw] of Object.entries(ICONS)) {
-    for (const [band, color] of Object.entries(ICON_COLORS)) {
-      stamp(map, `${name}-${band}`, color, band === "selected", draw);
-    }
+    stamp(map, name, "#f4f1ea", "#111111", false, draw);
+    stamp(map, `${name}-selected`, "#e8c17a", "#111111", true, draw);
   }
 
   map.addSource("airports", { type: "geojson", data: airports });
