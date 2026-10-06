@@ -305,9 +305,22 @@ export function installMapLayers(map, airports = EMPTY) {
   });
 
   map.addLayer({
+    id: "route-origin",
+    type: "line",
+    source: "route",
+    filter: ["==", ["get", "kind"], "origin"],
+    paint: {
+      "line-color": "#e8c17a",
+      "line-width": 1.6,
+      "line-opacity": 0.58,
+    },
+  });
+
+  map.addLayer({
     id: "route",
     type: "line",
     source: "route",
+    filter: ["==", ["get", "kind"], "dest"],
     paint: {
       "line-color": "#e8c17a",
       "line-width": 1.7,

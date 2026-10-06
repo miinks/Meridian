@@ -265,14 +265,19 @@ export class MeridianController {
       : undefined;
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
     const route = flight ? this.routeFor(flight) : null;
+    const originLabel = route?.origin
+      ? [route.origin.code, route.origin.name].filter(Boolean).join(" · ")
+      : null;
     const destLabel = route?.destination
       ? [route.destination.code, route.destination.name].filter(Boolean).join(" · ")
       : null;
+    const pending = route === undefined ? "Looking up…" : "—";
     const facts = flight
       ? [
           ["Flight", flight.airlineFlight || flight.callsign],
           ["Aircraft", formatAircraft(info, flight.category)],
-          ["Destination", destLabel || (route === undefined ? "Looking up…" : "—")],
+          ["Origin", originLabel || pending],
+          ["Destination", destLabel || pending],
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
@@ -710,21 +715,30 @@ export class MeridianController {
     const routeSource = this.map.getSource("route");
     if (!routeSource) return;
     const selected = this.selectedId ? this.flights.get(this.selectedId) : null;
-    const dest = selected ? this.routeFor(selected)?.destination : null;
-    if (!selected || !dest) {
+    const route = selected ? this.routeFor(selected) : null;
+    const origin = route?.origin;
+    const dest = route?.destination;
+    if (!selected || (!origin && !dest)) {
       routeSource.setData(EMPTY);
       return;
     }
     const selectedFeature = features.find((feature) => feature.properties.id === selected.id);
-    const from = selectedFeature?.geometry.coordinates || [selected.longitude, selected.latitude];
+    const here = selectedFeature?.geometry.coordinates || [selected.longitude, selected.latitude];
     routeSource.setData({
       type: "FeatureCollection",
-      features: splitAntimeridian(greatCircle(from[0], from[1], dest.longitude, dest.latitude)).map((coordinates) => ({
-        type: "Feature",
-        properties: {},
-        geometry: { type: "LineString", coordinates },
-      })),
+      features: [
+        ...(origin ? this.routeLineFeatures("origin", [origin.longitude, origin.latitude], here) : []),
+        ...(dest ? this.routeLineFeatures("dest", here, [dest.longitude, dest.latitude]) : []),
+      ],
     });
+  }
+
+  routeLineFeatures(kind, from, to) {
+    return splitAntimeridian(greatCircle(from[0], from[1], to[0], to[1])).map((coordinates) => ({
+      type: "Feature",
+      properties: { kind },
+      geometry: { type: "LineString", coordinates },
+    }));
   }
 
   // ---- tip -----------------------------------------------------------------
