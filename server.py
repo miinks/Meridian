@@ -5,9 +5,12 @@ Serves the React production build from dist/ when present.
 In development the Vite app on :5173 is the site and this process is API-only.
 """
 
+import csv
 import gzip
+import io
 import json
 import os
+import threading
 import time
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -19,7 +22,10 @@ ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 OPEN_SKY = "https://opensky-network.org/api"
 TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+METAR_CACHE_URL = "https://aviationweather.gov/data/cache/metars.cache.csv.gz"
 RATE_HEADERS = ("X-Rate-Limit-Remaining", "X-Rate-Limit-Retry-After-Seconds")
+CEILING_COVER = {"BKN", "OVC", "OVX", "VV"}
+METAR_TTL = 90
 
 
 def load_aircraft_db():
@@ -116,6 +122,119 @@ class TokenManager:
 tokens = TokenManager()
 
 
+def parse_csv_number(value):
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def important_airport_idents():
+    idents = set()
+    airports_path = ROOT / "public" / "airports.json"
+    runways_path = ROOT / "public" / "runways.json"
+    if airports_path.exists():
+        for row in json.loads(airports_path.read_text(encoding="utf-8")):
+            if row and row[0] == "L" and row[1]:
+                idents.add(row[1])
+    if runways_path.exists():
+        for row in json.loads(runways_path.read_text(encoding="utf-8")):
+            if row and row[0]:
+                idents.add(row[0])
+    return idents
+
+
+def compact_metar_row(row, header):
+    columns = {name: index for index, name in enumerate(header)}
+    get = lambda name: row[columns[name]] if name in columns and columns[name] < len(row) else ""
+    ident = (get("station_id") or "").strip().upper()
+    if not ident:
+        return None
+    layers = []
+    index = 0
+    while index < len(header):
+        if header[index] == "sky_cover":
+            sky = row[index].strip().upper() if index < len(row) else ""
+            height = (
+                parse_csv_number(row[index + 1])
+                if index + 1 < len(header) and header[index + 1] == "cloud_base_ft_agl" and index + 1 < len(row)
+                else None
+            )
+            if sky:
+                layers.append((sky, height))
+            index += 2
+            continue
+        index += 1
+    cover, base = "", None
+    for sky, height in layers:
+        if sky in CEILING_COVER and height is not None and (base is None or height < base):
+            cover, base = sky, height
+    if not cover and layers:
+        cover, base = layers[0]
+    visib = (get("visibility_statute_mi") or "").strip()
+    vis_number = parse_csv_number(visib.replace("+", ""))
+    cat = (get("flight_category") or "").strip().upper()
+    if cat in {"", "NULL", "UNK", "UNKNOWN"}:
+        cat = None
+    return {
+        "id": ident,
+        "cat": cat,
+        "raw": (get("raw_text") or "").strip() or None,
+        "temp": parse_csv_number(get("temp_c")),
+        "dewp": parse_csv_number(get("dewpoint_c")),
+        "wdir": parse_csv_number(get("wind_dir_degrees")),
+        "wspd": parse_csv_number(get("wind_speed_kt")),
+        "wgst": parse_csv_number(get("wind_gust_kt")),
+        "vis": visib or None,
+        "visSm": vis_number,
+        "altim": parse_csv_number(get("altim_in_hg")),
+        "wx": (get("wx_string") or "").strip() or None,
+        "cover": cover or None,
+        "base": base,
+        "time": (get("observation_time") or "").strip() or None,
+    }
+
+
+class MetarCache:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.fetched_at = 0
+        self.payload = []
+        self.idents = important_airport_idents()
+
+    def get(self):
+        now = time.time()
+        with self.lock:
+            if self.payload and now - self.fetched_at < METAR_TTL:
+                return self.payload
+            request = Request(METAR_CACHE_URL, headers={"User-Agent": "Meridian/0.2 (flight map)"})
+            with urlopen(request, timeout=25) as response:
+                text = gzip.decompress(response.read()).decode("utf-8", errors="replace")
+            reader = csv.reader(io.StringIO(text))
+            header = next(reader, None)
+            if not header:
+                self.payload = []
+                self.fetched_at = now
+                return self.payload
+            rows = []
+            for row in reader:
+                ident = row[1].strip().upper() if len(row) > 1 else ""
+                if self.idents and ident not in self.idents:
+                    continue
+                item = compact_metar_row(row, header)
+                if item:
+                    rows.append(item)
+            self.payload = rows
+            self.fetched_at = now
+            return self.payload
+
+
+metars = MetarCache()
+
+
 def retry_after_seconds(headers):
     if not headers:
         return None
@@ -147,6 +266,13 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/status":
             self.send_json(200, {"authenticated": tokens.authenticated})
+            return
+        if parsed.path == "/api/metar":
+            try:
+                self.send_json(200, metars.get())
+            except (HTTPError, URLError, OSError, TimeoutError) as error:
+                reason = getattr(error, "reason", None) or str(error)
+                self.send_json(502, {"error": str(reason)})
             return
         if parsed.path.startswith("/api/opensky"):
             self.proxy_opensky(parsed)
