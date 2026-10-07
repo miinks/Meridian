@@ -19,7 +19,7 @@ export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby }) 
       <p className="icao">{sheet.icao}</p>
       <dl>
         {sheet.facts.map(([label, value]) => (
-          <div key={label} className={label === "Runways" ? "wide" : undefined}>
+          <div key={label} className={label === "METAR" ? "wide metar" : label === "Runways" ? "wide" : undefined}>
             <dt>{label}</dt>
             <dd>{value}</dd>
           </div>

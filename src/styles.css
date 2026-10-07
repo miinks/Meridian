@@ -306,6 +306,12 @@ dt {
   grid-column: 1 / -1;
 }
 
+.sheet dl .metar dd {
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .follow {
   width: 100%;
   padding: 11px 12px;

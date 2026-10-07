@@ -23,6 +23,7 @@ import {
 } from "./format.js";
 import { highlightAirport, iconImageExpression, iconSizeExpression, AIRPORT_CLICK_LAYERS } from "./map.js";
 import { formatAircraft, iconFromTypecode } from "./identity.js";
+import { formatMetarSummary, isImportantAirport, METAR_MS, metarFacts } from "./weather.js";
 
 const noop = () => {};
 
@@ -66,6 +67,10 @@ export class MeridianController {
     this.searchValue = "";
     this.aircraftCache = new Map();
     this.routeCache = new Map();
+    this.metar = new Map();
+    this.metarLoaded = false;
+    this.metarInflight = false;
+    this.metarTimer = 0;
   }
 
   // ---- quota + pause -------------------------------------------------------
@@ -223,13 +228,17 @@ export class MeridianController {
     const listed = [...onGround.slice(0, 4), ...airborne.slice(0, 4)];
     const code = airport.iata || airport.ident;
     const pairs = this.runways.get(airport.ident) || [];
+    const metar = this.metar.get(airport.ident);
     const facts = [
       ["ICAO", airport.ident],
       ["IATA", airport.iata || "—"],
       ["Type", airportKindLabel(airport.type)],
-      ["Nearby", `${airborne.length} airborne · ${onGround.length} on ground`],
     ];
-    if (pairs.length) facts.splice(3, 0, ["Runways", pairs.join(" · ")]);
+    if (metar || isImportantAirport(airport, this.runways)) {
+      facts.push(...metarFacts(metar, { loaded: this.metarLoaded }));
+    }
+    if (pairs.length) facts.push(["Runways", pairs.join(" · ")]);
+    facts.push(["Nearby", `${airborne.length} airborne · ${onGround.length} on ground`]);
     this.cb.onSheet({
       kind: "airport",
       eyebrow: "Airport",
@@ -438,6 +447,41 @@ export class MeridianController {
   setRunways(runways) {
     this.runways = runways || new Map();
     if (this.selectedAirport) this.renderAirportSheet();
+  }
+
+  applyMetar(rows) {
+    const next = new Map();
+    for (const row of rows || []) {
+      if (row?.id) next.set(row.id, row);
+    }
+    const previous = [...this.metar.keys()];
+    this.metar = next;
+    this.metarLoaded = true;
+    if (!this.map.getSource("airports")) return;
+    for (const ident of previous) {
+      if (!next.has(ident)) this.map.setFeatureState({ source: "airports", id: ident }, { fltCat: null });
+    }
+    for (const [ident, metar] of next) {
+      this.map.setFeatureState({ source: "airports", id: ident }, { fltCat: metar.cat || null });
+    }
+    highlightAirport(this.map, this.selectedAirport?.ident || null);
+    if (this.selectedAirport) this.renderAirportSheet();
+  }
+
+  async refreshMetar() {
+    if (this.metarInflight || document.hidden) return;
+    this.metarInflight = true;
+    try {
+      const response = await fetch("/api/metar");
+      if (!response.ok) throw new Error(`METAR failed (${response.status})`);
+      const rows = await response.json();
+      if (Array.isArray(rows)) this.applyMetar(rows);
+    } catch {
+      this.metarLoaded = true;
+      if (this.selectedAirport) this.renderAirportSheet();
+    } finally {
+      this.metarInflight = false;
+    }
   }
 
   setAirlines(airlines) {
@@ -771,7 +815,9 @@ export class MeridianController {
     const airport = props.ident ? this.airports.find((item) => item.ident === props.ident) : null;
     const code = props.iata || airport?.iata || props.ident;
     const name = props.name || airport?.name;
-    const text = code && name ? `${code} · ${name}` : name || code;
+    const base = code && name ? `${code} · ${name}` : name || code;
+    const summary = formatMetarSummary(airport ? this.metar.get(airport.ident) : null);
+    const text = [base, summary].filter(Boolean).join(" · ");
     if (!text) return this.hideTip();
     this.cb.onTip({ visible: true, text, x: event.point.x, y: event.point.y });
   }
@@ -971,7 +1017,9 @@ export class MeridianController {
       this.renderSheet(null);
     }
     this.refresh();
+    this.refreshMetar();
     this.pollTimer = setInterval(() => this.refresh(), POLL_MS);
+    this.metarTimer = setInterval(() => this.refreshMetar(), METAR_MS);
     const tick = () => {
       this.paintFlights();
       this.rafId = requestAnimationFrame(tick);
@@ -982,6 +1030,7 @@ export class MeridianController {
   destroy() {
     if (this.quotaTimer) clearInterval(this.quotaTimer);
     if (this.pollTimer) clearInterval(this.pollTimer);
+    if (this.metarTimer) clearInterval(this.metarTimer);
     if (this.moveTimer) clearTimeout(this.moveTimer);
     if (this.rafId) cancelAnimationFrame(this.rafId);
   }

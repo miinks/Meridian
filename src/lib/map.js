@@ -1,4 +1,5 @@
 import { EMPTY, distanceKm } from "./format.js";
+import { weatherFillExpression, weatherStrokeExpression } from "./weather.js";
 
 export const AIRPORT_LAYERS = ["airports-large", "airports-medium", "airports-small"];
 export const AIRPORT_LABEL_LAYERS = ["airport-labels-large", "airport-labels-medium", "airport-labels-small"];
@@ -6,21 +7,32 @@ export const RUNWAY_LAYERS = ["runways", "runway-headings"];
 export const AIRPORT_CLICK_LAYERS = [...AIRPORT_LAYERS, ...AIRPORT_LABEL_LAYERS, ...RUNWAY_LAYERS];
 
 const AIRPORT_CIRCLE = {
-  "airports-large": { radius: 4.2, selectedRadius: 6.2, stroke: "rgba(232, 193, 122, 0.85)" },
-  "airports-medium": { radius: 3.1, selectedRadius: 4.6, stroke: "rgba(244, 241, 234, 0.42)" },
-  "airports-small": { radius: 2.2, selectedRadius: 3.4, stroke: "rgba(244, 241, 234, 0.28)" },
+  "airports-large": {
+    radius: 4.2,
+    selectedRadius: 6.2,
+    fill: "rgba(232, 193, 122, 0.18)",
+    stroke: "rgba(232, 193, 122, 0.85)",
+  },
+  "airports-medium": {
+    radius: 3.1,
+    selectedRadius: 4.6,
+    fill: "rgba(244, 241, 234, 0.08)",
+    stroke: "rgba(244, 241, 234, 0.42)",
+  },
+  "airports-small": {
+    radius: 2.2,
+    selectedRadius: 3.4,
+    fill: "rgba(244, 241, 234, 0.05)",
+    stroke: "rgba(244, 241, 234, 0.28)",
+  },
 };
 
 export function highlightAirport(map, ident) {
   const selected = ident || "";
   for (const [id, spec] of Object.entries(AIRPORT_CIRCLE)) {
     if (!map.getLayer(id)) continue;
-    map.setPaintProperty(id, "circle-stroke-color", [
-      "case",
-      ["==", ["get", "ident"], selected],
-      "rgba(232, 193, 122, 1)",
-      spec.stroke,
-    ]);
+    map.setPaintProperty(id, "circle-color", weatherFillExpression(selected, spec.fill));
+    map.setPaintProperty(id, "circle-stroke-color", weatherStrokeExpression(selected, spec.stroke));
     map.setPaintProperty(id, "circle-radius", [
       "case",
       ["==", ["get", "ident"], selected],
@@ -171,8 +183,8 @@ function airportCircle(id, types, minzoom, radius, fill, stroke) {
     filter: ["in", ["get", "type"], ["literal", types]],
     paint: {
       "circle-radius": radius,
-      "circle-color": fill,
-      "circle-stroke-color": stroke,
+      "circle-color": weatherFillExpression("", fill),
+      "circle-stroke-color": weatherStrokeExpression("", stroke),
       "circle-stroke-width": 1,
       "circle-opacity": 0.95,
     },
@@ -387,7 +399,7 @@ export function installMapLayers(map, airports = EMPTY, runways = { lines: EMPTY
     stamp(map, `${name}-selected`, "#e8c17a", "#111111", true, draw);
   }
 
-  map.addSource("airports", { type: "geojson", data: airports });
+  map.addSource("airports", { type: "geojson", data: airports, promoteId: "ident" });
   map.addLayer(airportCircle("airports-large", ["L"], 1, 4.2, "rgba(232, 193, 122, 0.18)", "rgba(232, 193, 122, 0.85)"));
   map.addLayer(airportCircle("airports-medium", ["M"], 4.2, 3.1, "rgba(244, 241, 234, 0.08)", "rgba(244, 241, 234, 0.42)"));
   map.addLayer(airportCircle("airports-small", ["S", "P"], 7.4, 2.2, "rgba(244, 241, 234, 0.05)", "rgba(244, 241, 234, 0.28)"));
