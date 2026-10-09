@@ -111,6 +111,58 @@ export function formatWait(seconds) {
   return `${secs}s`;
 }
 
+export function formatRoute(origin, destination, empty = "—") {
+  const from = origin?.code;
+  const to = destination?.code;
+  if (from && to) return `${from} → ${to}`;
+  if (from) return `${from} → —`;
+  if (to) return `— → ${to}`;
+  return empty;
+}
+
+const MIN_ETA_SPEED_MS = 25;
+
+export function etaSeconds(km, speedMs) {
+  if (!Number.isFinite(km) || km < 0 || !Number.isFinite(speedMs) || speedMs < MIN_ETA_SPEED_MS) return null;
+  const seconds = (km / (speedMs * 3.6)) * 3600;
+  if (!Number.isFinite(seconds) || seconds > 36 * 3600) return null;
+  return seconds;
+}
+
+export function formatEta(seconds) {
+  if (!Number.isFinite(seconds)) return "—";
+  if (seconds < 90) return "Soon";
+  const minutesTotal = Math.max(1, Math.round(seconds / 60));
+  const hours = Math.floor(minutesTotal / 60);
+  const minutes = minutesTotal % 60;
+  const duration = hours > 0 ? (minutes ? `${hours}h ${minutes}m` : `${hours}h`) : `${minutes}m`;
+  const clock = new Date(Date.now() + seconds * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${duration} · ${clock}`;
+}
+
+export function formatFlightEta(flight, destination) {
+  if (!flight || !destination) return "—";
+  const km = distanceKm(flight.latitude, flight.longitude, destination.latitude, destination.longitude);
+  if (flight.onGround && km <= 8) return "Arrived";
+  if (flight.onGround) return "—";
+  return formatEta(etaSeconds(km, flight.speedMs));
+}
+
+export function routeFacts(flight, route) {
+  const pending = route === undefined;
+  const origin = route?.origin;
+  const destination = route?.destination;
+  const empty = pending ? "Looking up…" : "—";
+  const facts = [["Route", formatRoute(origin, destination, empty)]];
+  if (!flight || !destination) {
+    facts.push(["ETA", pending ? "Looking up…" : "—"], ["Remaining", "—"]);
+    return facts;
+  }
+  const km = distanceKm(flight.latitude, flight.longitude, destination.latitude, destination.longitude);
+  facts.push(["ETA", formatFlightEta(flight, destination)], ["Remaining", formatDistance(km)]);
+  return facts;
+}
+
 export function parseFlight(row) {
   const [id, rawCallsign, country, , , lon, lat, altitude, onGround, speed, heading, verticalRate, , , squawk, , , category] =
     row;

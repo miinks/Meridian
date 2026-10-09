@@ -20,6 +20,7 @@ import {
   airportKindLabel,
   greatCircle,
   splitAntimeridian,
+  routeFacts,
 } from "./format.js";
 import { highlightAirport, iconImageExpression, iconSizeExpression, AIRPORT_CLICK_LAYERS } from "./map.js";
 import { formatAircraft, iconFromTypecode } from "./identity.js";
@@ -277,20 +278,12 @@ export class MeridianController {
         }
       : undefined;
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
-    const route = flight ? this.routeFor(flight) : null;
-    const originLabel = route?.origin
-      ? [route.origin.code, route.origin.name].filter(Boolean).join(" · ")
-      : null;
-    const destLabel = route?.destination
-      ? [route.destination.code, route.destination.name].filter(Boolean).join(" · ")
-      : null;
-    const pending = route === undefined ? "Looking up…" : "—";
+    const route = flight ? this.routeFor(flight) : undefined;
     const facts = flight
       ? [
           ["Flight", flight.airlineFlight || flight.callsign],
           ["Aircraft", formatAircraft(info, flight.category)],
-          ["Origin", originLabel || pending],
-          ["Destination", destLabel || pending],
+          ...routeFacts(flight, route),
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
           ["Heading", formatHeading(flight.heading)],
@@ -301,6 +294,7 @@ export class MeridianController {
       : [
           ["Flight", "—"],
           ["Aircraft", "Locating…"],
+          ...routeFacts(null, undefined),
           ["Altitude", "Locating…"],
           ["Speed", "—"],
           ["Heading", "—"],

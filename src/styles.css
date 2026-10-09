@@ -306,6 +306,10 @@ dt {
   grid-column: 1 / -1;
 }
 
+.sheet dl .wide dd {
+  letter-spacing: 0.01em;
+}
+
 .sheet dl .metar dd {
   font-size: 12px;
   line-height: 1.4;
