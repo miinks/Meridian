@@ -21,6 +21,9 @@ import {
   greatCircle,
   splitAntimeridian,
   routeFacts,
+  approachingAirport,
+  airportAsPlace,
+  sameAirport,
 } from "./format.js";
 import { highlightAirport, iconImageExpression, iconSizeExpression, AIRPORT_CLICK_LAYERS } from "./map.js";
 import { formatAircraft, iconFromTypecode } from "./identity.js";
@@ -68,6 +71,7 @@ export class MeridianController {
     this.searchValue = "";
     this.aircraftCache = new Map();
     this.routeCache = new Map();
+    this.approachCache = new Map();
     this.metar = new Map();
     this.metarLoaded = false;
     this.metarInflight = false;
@@ -278,7 +282,7 @@ export class MeridianController {
         }
       : undefined;
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
-    const route = flight ? this.routeFor(flight) : undefined;
+    const route = flight ? this.resolvedRoute(flight) : undefined;
     const facts = flight
       ? [
           ["Flight", flight.airlineFlight || flight.callsign],
@@ -388,6 +392,28 @@ export class MeridianController {
     const key = this.routeKey(flight?.callsign);
     if (!key || this.routeCache.get(key) === "pending") return undefined;
     return this.routeCache.get(key) || null;
+  }
+
+  inferredPlace(flight) {
+    if (!flight) return null;
+    const cached = this.approachCache.get(flight.id);
+    if (cached && cached.at === flight.receivedAt) return cached.place;
+    const place = airportAsPlace(approachingAirport(flight, this.airports));
+    this.approachCache.set(flight.id, { at: flight.receivedAt, place });
+    return place;
+  }
+
+  resolvedRoute(flight) {
+    if (!flight) return undefined;
+    const lookedUp = this.routeFor(flight);
+    const inferred = this.inferredPlace(flight);
+    if (!inferred) return lookedUp;
+    if (lookedUp?.origin && sameAirport(lookedUp.origin, inferred)) return lookedUp;
+    if (lookedUp?.destination && sameAirport(lookedUp.destination, inferred)) return lookedUp;
+    return {
+      origin: lookedUp?.origin || null,
+      destination: inferred,
+    };
   }
 
   airportByCode(code) {
@@ -762,7 +788,7 @@ export class MeridianController {
     const routeSource = this.map.getSource("route");
     if (!routeSource) return;
     const selected = this.selectedId ? this.flights.get(this.selectedId) : null;
-    const route = selected ? this.routeFor(selected) : null;
+    const route = selected ? this.resolvedRoute(selected) : null;
     const origin = route?.origin;
     const dest = route?.destination;
     if (!selected || (!origin && !dest)) {

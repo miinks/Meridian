@@ -23,6 +23,81 @@ export function formatDistance(km) {
   return `${Math.round(km)} km`;
 }
 
+export function headingDelta(from, to) {
+  return Math.abs(((Number(from) - Number(to) + 540) % 360) - 180);
+}
+
+export function bearingTo(lat1, lon1, lat2, lon2) {
+  const toRad = (degrees) => (degrees * Math.PI) / 180;
+  const toDeg = (radians) => (radians * 180) / Math.PI;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function approachLimits(type) {
+  if (type === "L") return { maxKm: 45, maxAltM: 3000, groundKm: 8 };
+  if (type === "M") return { maxKm: 28, maxAltM: 1800, groundKm: 5 };
+  return { maxKm: 12, maxAltM: 900, groundKm: 3.5 };
+}
+
+export function airportAsPlace(airport) {
+  if (!airport) return null;
+  return {
+    code: airport.iata || airport.ident,
+    ident: airport.ident,
+    name: airport.name || "",
+    longitude: airport.longitude,
+    latitude: airport.latitude,
+  };
+}
+
+export function sameAirport(left, right) {
+  if (!left || !right) return false;
+  const keys = (place) =>
+    [place.ident, place.code, place.iata]
+      .filter(Boolean)
+      .map((value) => String(value).trim().toUpperCase());
+  const set = new Set(keys(left));
+  return keys(right).some((value) => set.has(value));
+}
+
+export function approachingAirport(flight, airports) {
+  if (!flight || !airports?.length) return null;
+  const lat = flight.latitude;
+  const lon = flight.longitude;
+  const padLat = 45 / 111;
+  const padLon = 45 / (111 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+  let best = null;
+  for (const airport of airports) {
+    if (Math.abs(airport.latitude - lat) > padLat || Math.abs(airport.longitude - lon) > padLon) continue;
+    const limits = approachLimits(airport.type);
+    const km = distanceKm(lat, lon, airport.latitude, airport.longitude);
+    if (flight.onGround) {
+      if (km > limits.groundKm) continue;
+      const score = km + (airport.type === "L" ? 0 : airport.type === "M" ? 0.5 : 1.5);
+      if (!best || score < best.score) best = { airport, score };
+      continue;
+    }
+    if (km > limits.maxKm) continue;
+    const alt = flight.altitudeM;
+    if (Number.isFinite(alt) && alt > limits.maxAltM) continue;
+    if (Number.isFinite(alt) && alt > 120 + km * 95) continue;
+    const error = headingDelta(flight.heading, bearingTo(lat, lon, airport.latitude, airport.longitude));
+    const headingLimit = km < 3 ? 180 : km < 8 ? 80 : 48;
+    if (error > headingLimit) continue;
+    const climbing = Number.isFinite(flight.verticalRateMs) && flight.verticalRateMs > 2.5;
+    if (climbing && km > 5) continue;
+    const typePenalty = airport.type === "L" ? 0 : airport.type === "M" ? 1.8 : 5;
+    const score = km + error * 0.08 + typePenalty;
+    if (!best || score < best.score) best = { airport, score };
+  }
+  return best?.airport || null;
+}
+
 export function greatCircle(lon1, lat1, lon2, lat2, steps = 48) {
   const toRad = (degrees) => (degrees * Math.PI) / 180;
   const toDeg = (radians) => (radians * 180) / Math.PI;
