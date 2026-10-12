@@ -135,8 +135,12 @@ dt {
 }
 
 .results .worldwide {
-  justify-content: flex-start;
   color: var(--accent);
+}
+
+.results .worldwide span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .results .airport span {

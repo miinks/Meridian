@@ -10,7 +10,10 @@ export default function Results({ results, onPick, onPickAirport, onWorldwide })
             <li key={`flight-${item.id}`}>
               <button type="button" onClick={() => onPick(item.id)}>
                 <strong>{item.callsign}</strong>
-                <span>{item.airline || item.country}</span>
+                <span>
+                  {item.airline || item.country}
+                  {item.fromWorld ? " · world" : ""}
+                </span>
               </button>
             </li>
           );
@@ -29,7 +32,8 @@ export default function Results({ results, onPick, onPickAirport, onWorldwide })
           return (
             <li key="worldwide">
               <button type="button" className="worldwide" onClick={onWorldwide}>
-                Search worldwide for {item.query}
+                <strong>Scan the world for {item.query}</strong>
+                <span>Uses extra OpenSky credits</span>
               </button>
             </li>
           );

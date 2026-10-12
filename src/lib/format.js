@@ -1,6 +1,7 @@
 import { lookupAirline, aircraftIcon } from "./identity.js";
 
 export const POLL_MS = 10_000;
+export const LIVE_MIN_ZOOM = 5;
 export const EMPTY = { type: "FeatureCollection", features: [] };
 export const ICAO = /^[a-f0-9]{6}$/i;
 
