@@ -26,7 +26,7 @@ export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby }) 
             }
           >
             <dt>{label}</dt>
-            <dd>{value}</dd>
+            <dd data-wx={label === "Weather" ? value : undefined}>{value}</dd>
           </div>
         ))}
       </dl>

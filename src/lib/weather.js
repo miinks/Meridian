@@ -7,6 +7,8 @@ export const FLT_CAT_PAINT = {
   LIFR: { fill: "rgba(186, 120, 196, 0.22)", stroke: "rgba(186, 120, 196, 0.95)" },
 };
 
+export const FLT_CATS = ["VFR", "MVFR", "IFR", "LIFR"];
+
 export function isImportantAirport(airport, runways) {
   return airport?.type === "L" || Boolean(airport?.ident && runways?.has(airport.ident));
 }

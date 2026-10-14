@@ -376,13 +376,76 @@ dd {
 .credit {
   left: 20px;
   bottom: 20px;
-  padding: 8px 12px;
-  border-radius: 999px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  max-width: min(720px, calc(100vw - 40px));
+  padding: 8px 14px;
+  border-radius: 18px;
+}
+
+.wx-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wx-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wx-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(7, 8, 10, 0.55);
+}
+
+.wx-dot[data-cat="VFR"] {
+  background: rgb(110, 176, 122);
+}
+
+.wx-dot[data-cat="MVFR"] {
+  background: rgb(90, 148, 210);
+}
+
+.wx-dot[data-cat="IFR"] {
+  background: rgb(214, 110, 110);
+}
+
+.wx-dot[data-cat="LIFR"] {
+  background: rgb(186, 120, 196);
+}
+
+.credit-sources {
+  margin: 0;
 }
 
 .credit a {
   color: var(--ink);
   text-underline-offset: 2px;
+}
+
+dd[data-wx="VFR"] {
+  color: rgb(110, 176, 122);
+}
+
+dd[data-wx="MVFR"] {
+  color: rgb(90, 148, 210);
+}
+
+dd[data-wx="IFR"] {
+  color: rgb(214, 110, 110);
+}
+
+dd[data-wx="LIFR"] {
+  color: rgb(186, 120, 196);
 }
 
 .tip {
@@ -421,9 +484,16 @@ dd {
 
   .sheet {
     top: auto;
-    bottom: 64px;
+    bottom: 88px;
     right: 12px;
     left: 12px;
     width: auto;
+  }
+
+  .credit {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
   }
 }
