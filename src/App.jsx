@@ -153,6 +153,7 @@ export default function App() {
           setAirborneOnly(next);
           controllerRef.current?.setAirborneOnly(next);
         }}
+        onLocate={() => controllerRef.current?.locateMe()}
         status={status}
       />
       <Sheet

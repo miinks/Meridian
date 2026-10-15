@@ -12,6 +12,7 @@ export default function Hud({
   airborneOnly,
   onTogglePause,
   onToggleAirborne,
+  onLocate,
   status,
 }) {
   return (
@@ -51,6 +52,9 @@ export default function Hud({
           </button>
           <button type="button" className="chip" aria-pressed={airborneOnly} onClick={onToggleAirborne}>
             Airborne
+          </button>
+          <button type="button" className="chip" onClick={onLocate} aria-label="Go to your location">
+            You
           </button>
         </div>
         <div className="status" data-state={status.kind}>

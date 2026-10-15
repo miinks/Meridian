@@ -36,7 +36,7 @@ export function openingCamera() {
   return readSavedCamera() || FALLBACK_CAMERA;
 }
 
-export function locateUser() {
+export function locateUser(options = {}) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       resolve(null);
@@ -50,7 +50,7 @@ export function locateUser() {
         });
       },
       () => resolve(null),
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300_000 },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300_000, ...options },
     );
   });
 }

@@ -26,6 +26,7 @@ import {
   airportAsPlace,
   sameAirport,
 } from "./format.js";
+import { locateUser } from "./camera.js";
 import { highlightAirport, iconImageExpression, iconSizeExpression, AIRPORT_CLICK_LAYERS } from "./map.js";
 import { formatAircraft, iconFromTypecode } from "./identity.js";
 import { formatMetarSummary, isImportantAirport, METAR_MS, metarFacts } from "./weather.js";
@@ -69,6 +70,7 @@ export class MeridianController {
     this.runways = new Map();
     this.selectedAirport = null;
     this.programmaticMove = false;
+    this.locating = false;
     this.searchValue = "";
     this.worldResults = [];
     this.aircraftCache = new Map();
@@ -886,6 +888,38 @@ export class MeridianController {
   setAirborneOnly(value) {
     this.airborneOnly = value;
     this.renderResults(this.searchValue);
+  }
+
+  async locateMe() {
+    if (this.locating) return;
+    this.locating = true;
+    this.following = false;
+    if (this.selectedAirport) {
+      this.selectedAirport = null;
+      highlightAirport(this.map, null);
+    }
+    this.renderSheet(this.selectedId ? this.flights.get(this.selectedId) || null : null);
+    this.setStatus("loading", "Finding your location", "Using this device");
+    try {
+      const located = await locateUser({ timeout: 8000, maximumAge: 15_000 });
+      if (!located) {
+        this.setStatus("error", "Location unavailable", "Allow location access and try again");
+        return;
+      }
+      this.programmaticMove = true;
+      this.map.easeTo({
+        center: located.center,
+        zoom: located.zoom,
+        duration: 900,
+        offset: this.selectedId ? this.sheetOffset() : [0, 0],
+      });
+      this.map.once("moveend", () => {
+        this.bbox = boundsToBBox(this.map);
+        this.refresh();
+      });
+    } finally {
+      this.locating = false;
+    }
   }
 
   toggleFollow() {
