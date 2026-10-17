@@ -22,6 +22,7 @@ import {
   greatCircle,
   splitAntimeridian,
   routeFacts,
+  headingAgreesWith,
   approachingAirport,
   airportAsPlace,
   sameAirport,
@@ -834,11 +835,12 @@ export class MeridianController {
     }
     const selectedFeature = features.find((feature) => feature.properties.id === selected.id);
     const here = selectedFeature?.geometry.coordinates || [selected.longitude, selected.latitude];
+    const towardDest = dest && headingAgreesWith(selected, dest);
     routeSource.setData({
       type: "FeatureCollection",
       features: [
         ...(origin ? this.routeLineFeatures("origin", [origin.longitude, origin.latitude], here) : []),
-        ...(dest ? this.routeLineFeatures("dest", here, [dest.longitude, dest.latitude]) : []),
+        ...(towardDest ? this.routeLineFeatures("dest", here, [dest.longitude, dest.latitude]) : []),
       ],
     });
   }

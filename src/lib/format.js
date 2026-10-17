@@ -28,6 +28,13 @@ export function headingDelta(from, to) {
   return Math.abs(((Number(from) - Number(to) + 540) % 360) - 180);
 }
 
+export function headingAgreesWith(flight, place, maxDelta = 75) {
+  if (!flight || !place) return false;
+  if (flight.onGround) return true;
+  const bearing = bearingTo(flight.latitude, flight.longitude, place.latitude, place.longitude);
+  return headingDelta(flight.heading, bearing) <= maxDelta;
+}
+
 export function bearingTo(lat1, lon1, lat2, lon2) {
   const toRad = (degrees) => (degrees * Math.PI) / 180;
   const toDeg = (radians) => (radians * 180) / Math.PI;
@@ -229,12 +236,16 @@ export function routeFacts(flight, route) {
   const origin = route?.origin;
   const destination = route?.destination;
   const empty = pending ? "Looking up…" : "—";
-  const facts = [["Route", formatRoute(origin, destination, empty)]];
+  const facts = [["Typical route", formatRoute(origin, destination, empty)]];
   if (!flight || !destination) {
     facts.push(["ETA", pending ? "Looking up…" : "—"], ["Remaining", "—"]);
     return facts;
   }
   const km = distanceKm(flight.latitude, flight.longitude, destination.latitude, destination.longitude);
+  if (!headingAgreesWith(flight, destination)) {
+    facts.push(["ETA", "Off typical routing"], ["Remaining", formatDistance(km)]);
+    return facts;
+  }
   facts.push(["ETA", formatFlightEta(flight, destination)], ["Remaining", formatDistance(km)]);
   return facts;
 }
