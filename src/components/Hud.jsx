@@ -1,4 +1,5 @@
 import Results from "./Results.jsx";
+import { FIRST_HINT } from "../lib/hint.js";
 
 export default function Hud({
   searchValue,
@@ -14,6 +15,7 @@ export default function Hud({
   onToggleAirborne,
   onLocate,
   status,
+  hint,
 }) {
   return (
     <header className="hud">
@@ -65,6 +67,11 @@ export default function Hud({
           </div>
         </div>
       </div>
+      {hint ? (
+        <p className="first-hint" role="status">
+          {FIRST_HINT}
+        </p>
+      ) : null}
     </header>
   );
 }

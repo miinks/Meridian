@@ -49,6 +49,8 @@ export class MeridianController {
       onPaused: noop,
       onTip: noop,
       onSearchValue: noop,
+      onLiveTraffic: noop,
+      onEngage: noop,
       ...callbacks,
     };
 
@@ -166,6 +168,16 @@ export class MeridianController {
 
   setStatus(kind, label, meta) {
     this.cb.onStatus({ kind, label, meta });
+  }
+
+  engage() {
+    this.cb.onEngage();
+  }
+
+  maybeOfferHint() {
+    if (this.selectedId || this.selectedAirport) return;
+    if (this.visibleFlights().length === 0) return;
+    this.cb.onLiveTraffic();
   }
 
   // ---- flight collections --------------------------------------------------
@@ -724,6 +736,7 @@ export class MeridianController {
       if (tracked) this.lookupRoute(tracked);
       this.renderSheet(tracked || null);
       this.renderResults(this.searchValue);
+      this.maybeOfferHint();
     } catch (error) {
       if (error.code === "paused" || this.showQuotaWait() || this.paused) return;
       this.setStatus("error", "Signal lost", error.message);
@@ -736,6 +749,7 @@ export class MeridianController {
     const needle = query.trim().toLowerCase();
     if (needle.length < 2 || this.inflight) return;
     if (this.showQuotaWait() || this.paused) return;
+    this.engage();
 
     const hex = ICAO.test(needle);
     this.setStatus(
@@ -946,6 +960,7 @@ export class MeridianController {
   submitSearch() {
     const needle = this.searchValue.trim().toLowerCase();
     if (needle.length < 2) return;
+    this.engage();
 
     if (ICAO.test(needle)) {
       this.searchWorldwide(this.searchValue);
@@ -979,6 +994,7 @@ export class MeridianController {
   }
 
   pickResult(id) {
+    this.engage();
     const pinned = this.worldResults.find((flight) => flight.id === id);
     if (pinned && !this.flights.has(id)) this.ingest([pinned], { replace: false });
     this.worldResults = [];
@@ -993,6 +1009,7 @@ export class MeridianController {
     if (!airport) return;
 
     this.selectedAirport = airport;
+    this.engage();
     this.worldResults = [];
     highlightAirport(this.map, airport.ident);
     this.selectFlight(null);
@@ -1078,6 +1095,7 @@ export class MeridianController {
         if (ident) this.pickAirport(ident);
         return;
       }
+      this.engage();
       this.selectFlight(flight.properties.id, { follow: true, fly: true });
       return;
     }
@@ -1086,6 +1104,7 @@ export class MeridianController {
       return;
     }
     if (flight?.properties?.id) {
+      this.engage();
       this.selectFlight(flight.properties.id, { follow: true, fly: true });
       return;
     }

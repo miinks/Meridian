@@ -255,6 +255,16 @@ dt {
   font-size: 14px;
 }
 
+.first-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.4;
+}
+
 .sheet {
   top: 104px;
   right: 20px;
@@ -481,6 +491,10 @@ dd[data-wx="LIFR"] {
   .end,
   .status {
     justify-self: start;
+  }
+
+  .first-hint {
+    text-align: left;
   }
 
   .sheet {

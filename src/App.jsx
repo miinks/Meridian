@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
+import { hintWasDismissed, rememberHintDismissed } from "./lib/hint.js";
 import { AIRPORT_CLICK_LAYERS, airportIndex, installMapLayers, loadAirports, loadRunways, runwayIndex } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
@@ -24,6 +25,8 @@ export default function App() {
   const [airborneOnly, setAirborneOnly] = useState(true);
   const [searchValue, setSearchValue] = useState("");
   const [tip, setTip] = useState({ visible: false, text: "", x: 0, y: 0 });
+  const [showHint, setShowHint] = useState(false);
+  const hintDismissedRef = useRef(hintWasDismissed());
 
   useEffect(() => {
     const initial = openingCamera();
@@ -84,6 +87,17 @@ export default function App() {
         onPaused: setPaused,
         onTip: setTip,
         onSearchValue: setSearchValue,
+        onLiveTraffic: () => {
+          if (hintDismissedRef.current) return;
+          setShowHint(true);
+        },
+        onEngage: () => {
+          if (!hintDismissedRef.current) {
+            hintDismissedRef.current = true;
+            rememberHintDismissed();
+          }
+          setShowHint(false);
+        },
       });
       if (airports) controller.setAirports(airportIndex(airports));
       if (airlines) controller.setAirlines(airlines);
@@ -155,6 +169,7 @@ export default function App() {
         }}
         onLocate={() => controllerRef.current?.locateMe()}
         status={status}
+        hint={showHint}
       />
       <Sheet
         sheet={sheet}
