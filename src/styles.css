@@ -216,6 +216,7 @@ dt {
   padding: 8px 12px;
   font-size: 12px;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .chip[aria-pressed="true"],
