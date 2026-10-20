@@ -26,7 +26,7 @@ export default function Hud({
         <span className="search-label">Find a flight or airport</span>
         <input
           id="search"
-          placeholder="Callsign, ICAO, or airport"
+          placeholder="Try JFK or UAL123"
           autoComplete="off"
           spellCheck="false"
           value={searchValue}
