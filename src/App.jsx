@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
+import {
+  LOCATION_ASK,
+  LOCATION_OFF,
+  locateUser,
+  locationPermission,
+  openingCamera,
+  readSavedCamera,
+  saveCamera,
+} from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
 import {
   followHintWasDismissed,
@@ -34,6 +42,7 @@ export default function App() {
   const hintDismissedRef = useRef(hintWasDismissed());
   const [showFollowHint, setShowFollowHint] = useState(!followHintWasDismissed());
   const followHintDismissedRef = useRef(followHintWasDismissed());
+  const [locationNote, setLocationNote] = useState(null);
 
   const dismissFollowHint = () => {
     if (!followHintDismissedRef.current) {
@@ -44,8 +53,8 @@ export default function App() {
   };
 
   useEffect(() => {
+    const saved = readSavedCamera();
     const initial = openingCamera();
-    const locatePromise = locateUser();
     let cancelled = false;
     let userMoved = false;
 
@@ -77,17 +86,39 @@ export default function App() {
         loadRunways().catch(() => undefined),
       ]);
 
-      if (!bootIcao && !userMoved) {
-        setStatus({
-          kind: "loading",
-          label: "Finding your location",
-          meta: "OpenSky live positions",
-        });
-        const located = await locatePromise;
+      if (!bootIcao && !userMoved && !saved) {
+        const permission = await locationPermission();
         if (cancelled) return;
-        if (located && !userMoved) {
-          map.jumpTo(located);
-          saveCamera(map);
+        if (permission === "denied" || permission === "unsupported") {
+          setLocationNote("off");
+          setStatus({
+            kind: "idle",
+            label: "Showing a starting map",
+            meta: "Use Near me to show traffic around you",
+          });
+        } else {
+          if (permission !== "granted") setLocationNote("ask");
+          setStatus({
+            kind: "loading",
+            label: "To show traffic near you",
+            meta: permission === "granted" ? "OpenSky live positions" : "The browser may ask for location",
+          });
+          const located = await locateUser();
+          if (cancelled) return;
+          if (located.ok && !userMoved) {
+            setLocationNote(null);
+            map.jumpTo({ center: located.center, zoom: located.zoom });
+            saveCamera(map);
+          } else if (!located.ok) {
+            setLocationNote("off");
+            setStatus({
+              kind: "idle",
+              label: located.reason === "denied" ? "Location is off" : "Could not find you",
+              meta: "The map stays here · use Near me anytime",
+            });
+          } else {
+            setLocationNote(null);
+          }
         }
       }
 
@@ -112,7 +143,9 @@ export default function App() {
             rememberHintDismissed();
           }
           setShowHint(false);
+          setLocationNote(null);
         },
+        onLocationNote: setLocationNote,
       });
       if (airports) controller.setAirports(airportIndex(airports));
       if (airlines) controller.setAirlines(airlines);
@@ -185,6 +218,7 @@ export default function App() {
         onLocate={() => controllerRef.current?.locateMe()}
         status={status}
         hint={showHint}
+        locationNote={locationNote === "ask" ? LOCATION_ASK : locationNote === "off" ? LOCATION_OFF : null}
       />
       <Sheet
         sheet={sheet}
