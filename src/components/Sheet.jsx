@@ -1,4 +1,6 @@
-export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby }) {
+import { FOLLOW_HINT } from "../lib/hint.js";
+
+export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby, followHint }) {
   if (!sheet) return null;
 
   const isAirport = sheet.kind === "airport";
@@ -50,9 +52,16 @@ export default function Sheet({ sheet, onClose, onToggleFollow, onPickNearby }) 
           )}
         </ul>
       ) : (
-        <button type="button" className="follow" aria-pressed={sheet.following} onClick={onToggleFollow}>
-          {sheet.following ? "Following" : "Follow"}
-        </button>
+        <>
+          <button type="button" className="follow" aria-pressed={sheet.following} onClick={onToggleFollow}>
+            {sheet.following ? "Following" : "Follow"}
+          </button>
+          {followHint ? (
+            <p className="follow-hint" role="status">
+              {FOLLOW_HINT}
+            </p>
+          ) : null}
+        </>
       )}
     </aside>
   );
