@@ -16,6 +16,7 @@ export default function Hud({
   onLocate,
   status,
   hint,
+  locationNote,
 }) {
   return (
     <header className="hud">
@@ -55,7 +56,7 @@ export default function Hud({
           <button type="button" className="chip" aria-pressed={airborneOnly} onClick={onToggleAirborne}>
             In the air
           </button>
-          <button type="button" className="chip" onClick={onLocate}>
+          <button type="button" className="chip" onClick={onLocate} aria-label="Show traffic near you">
             Near me
           </button>
         </div>
@@ -67,9 +68,9 @@ export default function Hud({
           </div>
         </div>
       </div>
-      {hint ? (
+      {locationNote || hint ? (
         <p className="first-hint" role="status">
-          {FIRST_HINT}
+          {locationNote || FIRST_HINT}
         </p>
       ) : null}
     </header>
