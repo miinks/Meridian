@@ -3,6 +3,9 @@ export const FALLBACK_CAMERA = {
   zoom: 7.2,
 };
 
+export const LOCATION_ASK = "Allow location to show traffic near you.";
+export const LOCATION_OFF = "Location is off · Near me still works.";
+
 const STORAGE_KEY = "meridian.camera";
 const LOCATE_ZOOM = 7.2;
 
@@ -36,20 +39,37 @@ export function openingCamera() {
   return readSavedCamera() || FALLBACK_CAMERA;
 }
 
+export async function locationPermission() {
+  if (!navigator.geolocation) return "unsupported";
+  if (!navigator.permissions?.query) return "unknown";
+  try {
+    const result = await navigator.permissions.query({ name: "geolocation" });
+    return result.state;
+  } catch {
+    return "unknown";
+  }
+}
+
 export function locateUser(options = {}) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve(null);
+      resolve({ ok: false, reason: "unsupported" });
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
+          ok: true,
           center: [position.coords.longitude, position.coords.latitude],
           zoom: LOCATE_ZOOM,
         });
       },
-      () => resolve(null),
+      (error) => {
+        resolve({
+          ok: false,
+          reason: error?.code === 1 ? "denied" : "unavailable",
+        });
+      },
       { enableHighAccuracy: false, timeout: 5000, maximumAge: 300_000, ...options },
     );
   });

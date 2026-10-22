@@ -51,6 +51,7 @@ export class MeridianController {
       onSearchValue: noop,
       onLiveTraffic: noop,
       onEngage: noop,
+      onLocationNote: noop,
       ...callbacks,
     };
 
@@ -915,13 +916,19 @@ export class MeridianController {
       highlightAirport(this.map, null);
     }
     this.renderSheet(this.selectedId ? this.flights.get(this.selectedId) || null : null);
-    this.setStatus("loading", "Finding your location", "Using this device");
+    this.setStatus("loading", "Showing traffic near you", "The browser may ask for location");
     try {
       const located = await locateUser({ timeout: 8000, maximumAge: 15_000 });
-      if (!located) {
-        this.setStatus("error", "Location unavailable", "Allow location access and try again");
+      if (!located.ok) {
+        this.cb.onLocationNote("off");
+        this.setStatus(
+          located.reason === "denied" ? "idle" : "error",
+          located.reason === "denied" ? "Location is off" : "Could not find you",
+          "The map stays here · use Near me anytime",
+        );
         return;
       }
+      this.cb.onLocationNote(null);
       this.programmaticMove = true;
       this.map.easeTo({
         center: located.center,
