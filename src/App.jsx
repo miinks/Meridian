@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { locateUser, openingCamera, saveCamera } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
-import { hintWasDismissed, rememberHintDismissed } from "./lib/hint.js";
+import {
+  followHintWasDismissed,
+  hintWasDismissed,
+  rememberFollowHintDismissed,
+  rememberHintDismissed,
+} from "./lib/hint.js";
 import { AIRPORT_CLICK_LAYERS, airportIndex, installMapLayers, loadAirports, loadRunways, runwayIndex } from "./lib/map.js";
 import { MeridianController } from "./lib/controller.js";
 import Hud from "./components/Hud.jsx";
@@ -27,6 +32,16 @@ export default function App() {
   const [tip, setTip] = useState({ visible: false, text: "", x: 0, y: 0 });
   const [showHint, setShowHint] = useState(false);
   const hintDismissedRef = useRef(hintWasDismissed());
+  const [showFollowHint, setShowFollowHint] = useState(!followHintWasDismissed());
+  const followHintDismissedRef = useRef(followHintWasDismissed());
+
+  const dismissFollowHint = () => {
+    if (!followHintDismissedRef.current) {
+      followHintDismissedRef.current = true;
+      rememberFollowHintDismissed();
+    }
+    setShowFollowHint(false);
+  };
 
   useEffect(() => {
     const initial = openingCamera();
@@ -173,8 +188,15 @@ export default function App() {
       />
       <Sheet
         sheet={sheet}
-        onClose={() => controllerRef.current?.closeSheet()}
-        onToggleFollow={() => controllerRef.current?.toggleFollow()}
+        followHint={Boolean(showFollowHint && sheet && sheet.kind !== "airport")}
+        onClose={() => {
+          dismissFollowHint();
+          controllerRef.current?.closeSheet();
+        }}
+        onToggleFollow={() => {
+          dismissFollowHint();
+          controllerRef.current?.toggleFollow();
+        }}
         onPickNearby={(id) => controllerRef.current?.pickResult(id)}
       />
       <Credit />
