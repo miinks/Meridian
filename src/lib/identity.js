@@ -110,6 +110,5 @@ export function formatAircraft(info, category) {
   }
   if (info?.model) return info.typecode ? `${info.model} (${info.typecode})` : info.model;
   if (info?.typecode) return info.typecode;
-  const label = categoryLabel(category);
-  return label === "Aircraft" ? "Unknown type" : label;
+  return categoryLabel(category);
 }

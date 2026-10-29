@@ -291,12 +291,13 @@ export class MeridianController {
     }
 
     const callsign = flight?.callsign || this.selectedId?.toUpperCase() || "Flight";
+    const cached = flight ? this.aircraftCache.get(flight.id) : null;
     const info = flight
-      ? this.aircraftCache.get(flight.id) || {
-          model: flight.model,
-          typecode: flight.typecode,
-          manufacturer: flight.manufacturer,
-          operator: flight.airlineName,
+      ? {
+          model: cached?.model || flight.model,
+          typecode: cached?.typecode || flight.typecode,
+          manufacturer: cached?.manufacturer || flight.manufacturer,
+          operator: cached?.operator || flight.airlineName,
         }
       : undefined;
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
