@@ -204,7 +204,8 @@ dt {
 }
 
 .chip,
-.follow {
+.follow,
+.copy-link {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
@@ -331,10 +332,21 @@ dt {
   word-break: break-word;
 }
 
-.follow {
+.sheet-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.follow,
+.copy-link {
   width: 100%;
   padding: 11px 12px;
   border-radius: 14px;
+}
+
+.copy-link:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .follow-hint {
