@@ -195,6 +195,28 @@ export default function App() {
     controllerRef.current?.setSearchValue(value);
   };
 
+  const closePanel = () => {
+    dismissFollowHint();
+    controllerRef.current?.closeSheet();
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (results.visible) {
+        event.preventDefault();
+        setResults({ items: [], visible: false });
+        return;
+      }
+      if (!sheet) return;
+      event.preventDefault();
+      closePanel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [sheet, results.visible]);
+
   return (
     <>
       <div id="map" ref={mapContainerRef} />
@@ -223,10 +245,7 @@ export default function App() {
       <Sheet
         sheet={sheet}
         followHint={Boolean(showFollowHint && sheet && sheet.kind !== "airport")}
-        onClose={() => {
-          dismissFollowHint();
-          controllerRef.current?.closeSheet();
-        }}
+        onClose={closePanel}
         onToggleFollow={() => {
           dismissFollowHint();
           controllerRef.current?.toggleFollow();
