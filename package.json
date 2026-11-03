@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.jsx",
+    "test": "node --test src/lib/format.test.js src/lib/weather.test.js",
     "airports": "python3 scripts/build-airports.py",
     "airlines": "python3 scripts/build-airlines.py"
   },
