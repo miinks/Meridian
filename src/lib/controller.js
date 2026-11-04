@@ -292,20 +292,24 @@ export class MeridianController {
 
     const callsign = flight?.callsign || this.selectedId?.toUpperCase() || "Flight";
     const cached = flight ? this.aircraftCache.get(flight.id) : null;
+    const lookingUpAircraft = Boolean(flight ? !this.aircraftCache.has(flight.id) : this.selectedId);
     const info = flight
       ? {
           model: cached?.model || flight.model,
           typecode: cached?.typecode || flight.typecode,
           manufacturer: cached?.manufacturer || flight.manufacturer,
           operator: cached?.operator || flight.airlineName,
+          registration: cached?.registration || "",
         }
       : undefined;
+    const registration = info?.registration || (lookingUpAircraft ? "Looking up…" : "—");
     const airline = flight?.airlineName || this.airlineName(callsign) || info?.operator || "";
     const route = flight ? this.resolvedRoute(flight) : undefined;
     const facts = flight
       ? [
           ["Flight", flight.airlineFlight || flight.callsign],
           ["Aircraft", formatAircraft(info, flight.category)],
+          ["Registration", registration],
           ...routeFacts(flight, route),
           ["Altitude", formatAltitude(flight.altitudeM, flight.onGround)],
           ["Speed", formatSpeed(flight.speedMs)],
@@ -317,6 +321,7 @@ export class MeridianController {
       : [
           ["Flight", "—"],
           ["Aircraft", "Locating…"],
+          ["Registration", "Looking up…"],
           ...routeFacts(null, undefined),
           ["Altitude", "Locating…"],
           ["Speed", "—"],
