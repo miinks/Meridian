@@ -203,6 +203,29 @@ dt {
   gap: 8px;
 }
 
+.more {
+  position: relative;
+}
+
+.more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 168px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(10, 11, 13, 0.94);
+  z-index: 3;
+}
+
+.more-menu .chip {
+  width: 100%;
+  border-radius: 12px;
+}
+
 .chip,
 .follow,
 .copy-link {
