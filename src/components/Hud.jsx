@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import Results from "./Results.jsx";
 import { FIRST_HINT } from "../lib/hint.js";
 
@@ -18,6 +19,29 @@ export default function Hud({
   hint,
   locationNote,
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
+  const extrasOn = paused || !airborneOnly;
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const onPointerDown = (event) => {
+      if (!moreRef.current?.contains(event.target)) setMoreOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [moreOpen]);
+
   return (
     <header className="hud">
       <div className="brand">
@@ -50,12 +74,29 @@ export default function Hud({
 
       <div className="end">
         <div className="chips">
-          <button type="button" className="chip" aria-pressed={paused} onClick={onTogglePause}>
-            {paused ? "Resume" : "Pause"}
-          </button>
-          <button type="button" className="chip" aria-pressed={airborneOnly} onClick={onToggleAirborne}>
-            In the air
-          </button>
+          <div className="more" ref={moreRef}>
+            <button
+              type="button"
+              className="chip"
+              aria-expanded={moreOpen}
+              aria-haspopup="true"
+              aria-pressed={extrasOn}
+              aria-label={extrasOn ? "More map options, some are on" : "More map options"}
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              More
+            </button>
+            {moreOpen ? (
+              <div className="more-menu">
+                <button type="button" className="chip" aria-pressed={paused} onClick={onTogglePause}>
+                  {paused ? "Resume updates" : "Pause updates"}
+                </button>
+                <button type="button" className="chip" aria-pressed={airborneOnly} onClick={onToggleAirborne}>
+                  Hide ground
+                </button>
+              </div>
+            ) : null}
+          </div>
           <button type="button" className="chip" onClick={onLocate} aria-label="Show traffic near you">
             Near me
           </button>
