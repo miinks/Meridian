@@ -11,6 +11,8 @@ import {
 } from "./lib/camera.js";
 import { loadAirlines } from "./lib/format.js";
 import {
+  CLICK_HINT,
+  EMPTY_HINT,
   followHintWasDismissed,
   hintWasDismissed,
   rememberFollowHintDismissed,
@@ -38,7 +40,7 @@ export default function App() {
   const [airborneOnly, setAirborneOnly] = useState(true);
   const [searchValue, setSearchValue] = useState("");
   const [tip, setTip] = useState({ visible: false, text: "", x: 0, y: 0 });
-  const [showHint, setShowHint] = useState(false);
+  const [hint, setHint] = useState(null);
   const hintDismissedRef = useRef(hintWasDismissed());
   const [showFollowHint, setShowFollowHint] = useState(!followHintWasDismissed());
   const followHintDismissedRef = useRef(followHintWasDismissed());
@@ -133,16 +135,16 @@ export default function App() {
         onPaused: setPaused,
         onTip: setTip,
         onSearchValue: setSearchValue,
-        onLiveTraffic: () => {
+        onLiveTraffic: (empty) => {
           if (hintDismissedRef.current) return;
-          setShowHint(true);
+          setHint(empty ? EMPTY_HINT : CLICK_HINT);
         },
         onEngage: () => {
           if (!hintDismissedRef.current) {
             hintDismissedRef.current = true;
             rememberHintDismissed();
           }
-          setShowHint(false);
+          setHint(null);
           setLocationNote(null);
         },
         onLocationNote: setLocationNote,
@@ -239,7 +241,7 @@ export default function App() {
         }}
         onLocate={() => controllerRef.current?.locateMe()}
         status={status}
-        hint={showHint}
+        hint={hint}
         locationNote={locationNote === "ask" ? LOCATION_ASK : locationNote === "off" ? LOCATION_OFF : null}
       />
       <Sheet

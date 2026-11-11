@@ -177,8 +177,8 @@ export class MeridianController {
 
   maybeOfferHint() {
     if (this.selectedId || this.selectedAirport) return;
-    if (this.visibleFlights().length === 0) return;
-    this.cb.onLiveTraffic();
+    const empty = this.map.getZoom() < LIVE_MIN_ZOOM || this.visibleFlights().length === 0;
+    this.cb.onLiveTraffic(empty);
   }
 
   // ---- flight collections --------------------------------------------------
@@ -693,6 +693,7 @@ export class MeridianController {
       if (this.selectedAirport) this.renderAirportSheet();
       else this.renderSheet(null);
       this.renderResults(this.searchValue);
+      this.maybeOfferHint();
       return;
     }
 

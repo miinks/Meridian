@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Results from "./Results.jsx";
-import { FIRST_HINT } from "../lib/hint.js";
 
 export default function Hud({
   searchValue,
@@ -111,7 +110,7 @@ export default function Hud({
       </div>
       {locationNote || hint ? (
         <p className="first-hint" role="status">
-          {locationNote || FIRST_HINT}
+          {locationNote || hint}
         </p>
       ) : null}
     </header>

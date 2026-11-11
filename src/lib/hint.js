@@ -1,7 +1,8 @@
 const STORAGE_KEY = "meridian.hint";
 const FOLLOW_STORAGE_KEY = "meridian.follow-hint";
 
-export const FIRST_HINT = "Click a plane, or search an airport like JFK.";
+export const EMPTY_HINT = "Zoom in, or tap Near me, to see flights.";
+export const CLICK_HINT = "Click a plane.";
 export const FOLLOW_HINT = "Follow keeps the map on this flight.";
 
 export function hintWasDismissed() {
