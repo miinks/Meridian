@@ -440,6 +440,17 @@ dd {
   border-radius: 18px;
 }
 
+.wx {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.wx-label {
+  margin: 0;
+}
+
 .wx-legend {
   display: flex;
   flex-wrap: wrap;
