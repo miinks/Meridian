@@ -65,6 +65,7 @@ export default function App() {
       style: "https://tiles.openfreemap.org/styles/dark",
       center: initial.center,
       zoom: initial.zoom,
+      renderWorldCopies: false,
       attributionControl: { compact: true },
     });
 
