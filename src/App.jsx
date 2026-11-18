@@ -30,8 +30,8 @@ export default function App() {
   const controllerRef = useRef(null);
 
   const [status, setStatus] = useState({
-    kind: "idle",
-    label: "Waiting for the map",
+    kind: "loading",
+    label: "Loading the map",
     meta: "OpenSky live positions",
   });
   const [sheet, setSheet] = useState(null);
