@@ -9,16 +9,24 @@ The site is the React + Vite app at the repo root.
 
 ## Develop
 
-```bash
-# terminal 1 — OpenSky proxy on :8000
-PORT=8000 python3 server.py
+Two terminals. The proxy defaults to port 8000.
+
+On Windows:
+
+```powershell
+# terminal 1 — OpenSky proxy
+py -3 server.py
 
 # terminal 2 — Vite on :5173 (proxies /api -> :8000)
 npm install
 npm run dev
 ```
 
+On macOS and Linux, use `python3 server.py` in terminal 1.
+
 Then open http://127.0.0.1:5173.
+
+`npm run proxy` also starts `server.py`. It looks for `py -3` on Windows and `python3` elsewhere.
 
 Set `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` (or a `credentials.json` next
 to `server.py`) for authenticated OpenSky access; otherwise it runs anonymously.
@@ -34,7 +42,9 @@ elsewhere.
 - `npm run dev` — Vite dev server with HMR.
 - `npm run build` — production build to `dist/`.
 - `npm run preview` — serve the production build (also proxies `/api`).
+- `npm run proxy` — OpenSky / METAR proxy (`py -3` or `python3`).
 - `npm run lint` — ESLint.
+- `npm test` — heading, route, METAR, and aircraft-label tests.
 - `npm run airports` — rebuild `public/airports.json` and `public/runways.json` from OurAirports.
 - `npm run airlines` — rebuild `public/airlines.json` from OpenFlights.
 
