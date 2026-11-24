@@ -536,20 +536,59 @@ dd[data-wx="LIFR"] {
 
 @media (max-width: 820px) {
   .hud {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 10px;
     right: 12px;
     left: 12px;
     top: 12px;
+    padding: 10px 12px;
+    border-radius: 18px;
   }
 
-  .end,
+  .brand {
+    min-width: 0;
+  }
+
+  .wordmark {
+    font-size: 22px;
+  }
+
+  .tag,
+  .search-label,
+  .status-meta {
+    display: none;
+  }
+
+  .search {
+    grid-column: 1 / -1;
+  }
+
+  .search input {
+    padding: 9px 11px;
+  }
+
+  .end {
+    display: contents;
+  }
+
+  .chips {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
   .status {
+    grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .status-label {
+    font-size: 13px;
   }
 
   .first-hint {
     text-align: left;
+    font-size: 12px;
   }
 
   .sheet {
