@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Results from "./Results.jsx";
+import { activateSearchItem, moveSearchActive } from "../lib/search.js";
 
 export default function Hud({
   searchValue,
@@ -19,8 +20,14 @@ export default function Hud({
   locationNote,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const moreRef = useRef(null);
   const extrasOn = paused || !airborneOnly;
+  const resultItems = results.items || [];
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchValue, results.visible]);
 
   useEffect(() => {
     if (!moreOpen) return undefined;
@@ -55,16 +62,36 @@ export default function Hud({
           placeholder="Try JFK or UAL123"
           autoComplete="off"
           spellCheck="false"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={Boolean(results.visible)}
+          aria-controls="search-results"
+          aria-activedescendant={activeIndex >= 0 ? `search-result-${activeIndex}` : undefined}
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              if (!results.visible || resultItems.length === 0) return;
+              event.preventDefault();
+              const direction = event.key === "ArrowDown" ? 1 : -1;
+              setActiveIndex((index) => moveSearchActive(resultItems, index, direction));
+              return;
+            }
             if (event.key !== "Enter") return;
             event.preventDefault();
+            if (results.visible && activateSearchItem(resultItems[activeIndex], {
+              onPick: onPickResult,
+              onPickAirport: onPickAirport,
+              onWorldwide,
+            })) {
+              return;
+            }
             onSearchSubmit();
           }}
         />
         <Results
           results={results}
+          activeIndex={activeIndex}
           onPick={onPickResult}
           onPickAirport={onPickAirport}
           onWorldwide={onWorldwide}

@@ -182,6 +182,11 @@ dt {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.results button.active {
+  background: rgba(232, 193, 122, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(232, 193, 122, 0.4);
+}
+
 .results button:disabled {
   color: var(--muted);
   cursor: default;
