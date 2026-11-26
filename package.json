@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.jsx",
-    "test": "node --test src/lib/format.test.js src/lib/weather.test.js src/lib/identity.test.js",
+    "test": "node --test src/lib/format.test.js src/lib/weather.test.js src/lib/identity.test.js src/lib/search.test.js",
     "airports": "node scripts/run-python.mjs scripts/build-airports.py",
     "airlines": "node scripts/run-python.mjs scripts/build-airlines.py",
     "proxy": "node scripts/run-python.mjs server.py"
